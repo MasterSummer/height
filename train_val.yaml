@@ -1,0 +1,35 @@
+train:
+  encoder: resnet34
+  tracks_json: analysis_runs/dataset_rank/camera_400cm_slantside_tracks.json
+  pairs_json: analysis_runs/dataset_rank/camera_400cm_slantside_pairs.json
+  frame_size: "128,64"
+  bbox_format: xywh
+  full_frame: true
+  context_ratio: 0.2
+  split: train
+  split_mode: leave_one
+  leave_one_id: "0312_man3_UpChange_shoulder_400cm_slantside_male_day_yhjz100_id515"
+  val: true
+  val_split: test
+  val_split_mode: leave_one
+  val_leave_one_id: "0312_man3_UpChange_shoulder_400cm_slantside_male_day_yhjz100_id515"
+  val_batch_size: 16
+  rank_eval: true
+  rank_samples: 3
+  rank_output: "analysis_runs/rank_eval_400cm_slantside.json"
+  epochs: 50
+  batch_size: 16
+  lr: 0.001
+
+val:
+  encoder: resnet34
+  tracks_json: analysis_runs/dataset_rank/camera_400cm_slantside_tracks.json
+  pairs_json: analysis_runs/dataset_rank/camera_400cm_slantside_pairs.json
+  frame_size: "128,64"
+  bbox_format: xywh
+  split: test
+  split_mode: leave_one
+  leave_one_id: "0320_woman3_UpDnChange1_phone_400cm_slantside_female_day_yhjz100_id308"
+  epochs: 1
+  batch_size: 16
+  lr: 0.001
