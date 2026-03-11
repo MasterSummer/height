@@ -1,0 +1,22 @@
+# 默认超参数配置
+T: 32                # 每个视频采样帧数
+bbox_dim: 4          # bbox 维度 (x, y, w, h)
+d_model: 128         # Transformer/MLP 隐层维度
+num_layers: 2        # Transformer 层数
+height_dim: 32       # 身高表征维度
+perspective_dim: 16  # 透视表征维度
+lr: 0.0005           # 学习率
+weight_decay: 0.01   # AdamW 权重衰减
+clip_grad: 1.0       # 梯度裁剪
+loss_weight:
+  frame_consistency: 1.0
+  recon: 1.0
+  ranking: 1.0
+pair_sampling: 'hard' # pairwise ranking loss 采样策略 ['all', 'hard']
+batch_size: 8
+num_epochs: 50
+save_dir: './checkpoints'
+log_interval: 10
+seed: 42
+train_list: 'height_rank/train_list.txt'
+test_list: 'height_rank/test_list.txt'
