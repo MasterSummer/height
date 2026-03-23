@@ -1,0 +1,32 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# 系统文件
+.DS_Store
+
+# 日志
+*.log
+
+# 忽略 data 下所有具体文件
+2503_test_bg/**/*
+2503_test_bg_depthmap/**/*
+2503_test_labels_nochange_normal/**/*
+2503_test_videos/**/*
+DEIMv2
+ORViT
+height/model/
+# 但保留目录占位文件
+!2503_test_bg/**/.gitkeep
+!2503_test_bg_depthmap/**/.gitkeep
+!2503_test_labels_nochange_normal/**/.gitkeep
+!2503_test_videos/**/.gitkeep

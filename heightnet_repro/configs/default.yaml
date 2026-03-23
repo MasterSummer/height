@@ -1,0 +1,36 @@
+seed: 42
+device: cuda
+
+paths:
+  train_manifest: data/train_manifest.csv
+  val_manifest: data/val_manifest.csv
+  test_manifest: data/test_manifest.csv
+  output_dir: runs/default
+
+train:
+  epochs: 20
+  batch_size: 8
+  num_workers: 4
+  lr: 1.0e-4
+  weight_decay: 1.0e-4
+  grad_clip_norm: 1.0
+  use_amp: true
+
+loss:
+  silog_lambda: 0.85
+  consistency_weight: 0.1
+  consistency_warmup_epochs: 5
+
+data:
+  image_size: [352, 704]
+  normalize_rgb: true
+  use_pair_consistency: true
+  max_matches: 512
+
+model:
+  name: heightnet_tiny
+  base_channels: 32
+
+eval:
+  save_visualizations: true
+  vis_limit: 20

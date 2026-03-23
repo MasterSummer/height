@@ -1,22 +1,47 @@
-# 默认超参数配置
-T: 32                # 每个视频采样帧数
-bbox_dim: 4          # bbox 维度 (x, y, w, h)
-d_model: 128         # Transformer/MLP 隐层维度
-num_layers: 2        # Transformer 层数
-height_dim: 32       # 身高表征维度
-perspective_dim: 16  # 透视表征维度
-lr: 0.0005           # 学习率
-weight_decay: 0.01   # AdamW 权重衰减
-clip_grad: 1.0       # 梯度裁剪
-loss_weight:
-  frame_consistency: 1.0
-  recon: 1.0
-  ranking: 1.0
-pair_sampling: 'hard' # pairwise ranking loss 采样策略 ['all', 'hard']
-batch_size: 8
-num_epochs: 50
-save_dir: './checkpoints'
-log_interval: 10
-seed: 42
-train_list: 'height_rank/train_list.txt'
-test_list: 'height_rank/test_list.txt'
+data:
+  video_dir: "/data1/zhaoyd/tmp_test_videos"
+  bbox_dir: "/data1/zhaoyd/height/processed_labels"
+  rank_dir: "/data1/zhaoyd/height/labels_rank"
+  train_list: null
+  test_list: null
+
+model:
+  T: 32
+  bbox_dim: 4
+  d_model: 128
+  nhead: 4
+  num_layers: 2
+  dropout: 0.1
+  height_dim: 32
+  perspective_dim: 16
+  decoder_hidden_dim: 128
+
+train:
+  seed: 42
+  batch_size: 8
+  num_workers: 0
+  num_epochs: 50
+  stage_a_epochs: 25
+  val_ratio: 0.2
+  lr: 5.0e-4
+  stage_b_lr_mult: 0.2
+  weight_decay: 1.0e-3
+  clip_grad: 1.0
+  log_interval: 10
+  log_dir: "height_rank/runs/default"
+  save_dir: "height_rank/checkpoints/default"
+
+loss:
+  w_frame: 1.0
+  w_recon: 1.0
+  w_rank: 1.0
+
+pair_sampling:
+  sampling: "hard"      # all | hard
+  hard_margin: 2.0      # |rank_i-rank_j| <= hard_margin
+  max_pairs: 256        # null 表示不限
+
+video:
+  enabled: false
+  frame_size: 112
+  video_dim: 128
