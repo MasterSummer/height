@@ -18,15 +18,28 @@ env/
 *.log
 
 # 忽略 data 下所有具体文件
-2503_test_bg/**/*
-2503_test_bg_depthmap/**/*
-2503_test_labels_nochange_normal/**/*
-2503_test_videos/**/*
+2503_test_bg/**
+!2503_test_bg/**/
+!2503_test_bg/**/.gitkeep
+
+2503_test_bg_depthmap/**
+!2503_test_bg_depthmap/**/
+!2503_test_bg_depthmap/**/.gitkeep
+
+2503_test_labels_nochange_normal/**
+!2503_test_labels_nochange_normal/**/
+!2503_test_labels_nochange_normal/**/.gitkeep
+
+2503_test_videos/**
+!2503_test_videos/**/
+!2503_test_videos/**/.gitkeep
+heightnet_data_midrun/
+heightnet_data_midrun_person_camera_split/
+heightnet_data_midrun_person_split/
+heightnet_data_midrun_subset/
+models/
 DEIMv2
 ORViT
-height/model/
-# 但保留目录占位文件
-!2503_test_bg/**/.gitkeep
-!2503_test_bg_depthmap/**/.gitkeep
-!2503_test_labels_nochange_normal/**/.gitkeep
-!2503_test_videos/**/.gitkeep
+height/model/2503_test_bg/
+2503_test_bg_depthmap/
+selected_30_per_person_camera_one_video.txt

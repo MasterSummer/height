@@ -24,6 +24,9 @@ class TrainConfig:
     weight_decay: float
     grad_clip_norm: float
     use_amp: bool
+    use_tensorboard: bool = True
+    log_interval: int = 20
+    tb_num_images: int = 4
 
 
 @dataclass
@@ -31,6 +34,10 @@ class LossConfig:
     silog_lambda: float
     consistency_weight: float
     consistency_warmup_epochs: int
+    pairwise_weight: float = 0.0
+    pairwise_enabled: bool = False
+    pairwise_json: str = ""
+    pairwise_warmup_epochs: int = 0
 
 
 @dataclass
@@ -54,6 +61,16 @@ class EvalConfig:
 
 
 @dataclass
+class RuntimeSegConfig:
+    enabled: bool
+    model_path: str
+    conf: float
+    iou: float
+    imgsz: int
+    strict_native: bool
+
+
+@dataclass
 class Config:
     seed: int
     device: str
@@ -63,6 +80,7 @@ class Config:
     data: DataConfig
     model: ModelConfig
     eval: EvalConfig
+    runtime_seg: RuntimeSegConfig
 
 
 def _to_abs(base_dir: str, path: str) -> str:
@@ -85,13 +103,25 @@ def load_config(path: str) -> Config:
         output_dir=_to_abs(workspace, raw["paths"]["output_dir"]),
     )
 
+    loss_raw = dict(raw["loss"])
+    if loss_raw.get("pairwise_json"):
+        loss_raw["pairwise_json"] = _to_abs(workspace, loss_raw["pairwise_json"])
+
     return Config(
         seed=raw["seed"],
         device=raw["device"],
         paths=paths,
         train=TrainConfig(**raw["train"]),
-        loss=LossConfig(**raw["loss"]),
+        loss=LossConfig(**loss_raw),
         data=DataConfig(**raw["data"]),
         model=ModelConfig(**raw["model"]),
         eval=EvalConfig(**raw["eval"]),
+        runtime_seg=RuntimeSegConfig(**raw.get("runtime_seg", {
+            "enabled": False,
+            "model_path": "",
+            "conf": 0.25,
+            "iou": 0.7,
+            "imgsz": 640,
+            "strict_native": True,
+        })),
     )

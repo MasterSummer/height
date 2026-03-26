@@ -20,6 +20,7 @@ class SampleRow:
     frame_idx: int
     person_id: str
     camera_id: str
+    person_mask_path: str
 
 
 class HeightDataset(Dataset):
@@ -46,14 +47,12 @@ class HeightDataset(Dataset):
             "valid_mask_path",
             "sequence_id",
             "frame_idx",
-            "matches_root",
         }
         missing = required_cols - set(frame.columns)
         if missing:
             raise ValueError(f"Manifest missing columns: {sorted(missing)}")
 
         self.rows: List[SampleRow] = []
-        self.matches_root: List[str] = []
         for _, row in frame.iterrows():
             self.rows.append(
                 SampleRow(
@@ -64,9 +63,9 @@ class HeightDataset(Dataset):
                     frame_idx=int(row["frame_idx"]),
                     person_id=str(row["person_id"]) if "person_id" in frame.columns else "unknown_person",
                     camera_id=str(row["camera_id"]) if "camera_id" in frame.columns else "unknown_camera",
+                    person_mask_path=str(row["person_mask_path"]) if "person_mask_path" in frame.columns else "",
                 )
             )
-            self.matches_root.append(str(row["matches_root"]))
 
         self.seq_to_indices: Dict[str, List[int]] = {}
         for idx, row in enumerate(self.rows):
@@ -78,19 +77,21 @@ class HeightDataset(Dataset):
     def __len__(self) -> int:
         return len(self.rows)
 
-    def _load_rgb(self, path: str) -> np.ndarray:
+    def _load_rgb_pair(self, path: str) -> tuple[np.ndarray, np.ndarray]:
         img = cv2.imread(path, cv2.IMREAD_COLOR)
         if img is None:
             raise FileNotFoundError(path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (self.image_w, self.image_h), interpolation=cv2.INTER_LINEAR)
+        raw = img.copy()
         img = img.astype(np.float32) / 255.0
         if self.normalize_rgb:
             mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
             std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
             img = (img - mean) / std
         img = np.transpose(img, (2, 0, 1))
-        return img
+        raw = np.transpose(raw, (2, 0, 1))
+        return img, raw
 
     def _load_height(self, path: str) -> np.ndarray:
         arr = np.load(path).astype(np.float32)
@@ -98,7 +99,13 @@ class HeightDataset(Dataset):
         return arr
 
     def _load_mask(self, path: str) -> np.ndarray:
-        arr = np.load(path).astype(np.float32)
+        if path.lower().endswith(".npy"):
+            arr = np.load(path).astype(np.float32)
+        else:
+            arr = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if arr is None:
+                raise FileNotFoundError(path)
+            arr = arr.astype(np.float32) / 255.0
         arr = cv2.resize(arr, (self.image_w, self.image_h), interpolation=cv2.INTER_NEAREST)
         return (arr > 0.5).astype(np.float32)
 
@@ -112,53 +119,34 @@ class HeightDataset(Dataset):
             return indices[pos - 1]
         return idx
 
-    def _load_matches(self, idx0: int, idx1: int) -> np.ndarray:
-        row0 = self.rows[idx0]
-        row1 = self.rows[idx1]
-        matches_root = self.matches_root[idx0]
-        if idx0 == idx1:
-            return np.zeros((0, 4), dtype=np.float32)
-
-        file_name = f"{row0.frame_idx:06d}_{row1.frame_idx:06d}.npz"
-        path = os.path.join(matches_root, row0.sequence_id, file_name)
-        if not os.path.exists(path):
-            return np.zeros((0, 4), dtype=np.float32)
-
-        data = np.load(path)
-        pts0 = data["pts0"].astype(np.float32)
-        pts1 = data["pts1"].astype(np.float32)
-        n = min(len(pts0), len(pts1), self.max_matches)
-        if n == 0:
-            return np.zeros((0, 4), dtype=np.float32)
-        pts0 = pts0[:n]
-        pts1 = pts1[:n]
-
-        sx = self.image_w / float(data.get("orig_w", self.image_w))
-        sy = self.image_h / float(data.get("orig_h", self.image_h))
-        pts0[:, 0] *= sx
-        pts0[:, 1] *= sy
-        pts1[:, 0] *= sx
-        pts1[:, 1] *= sy
-        return np.concatenate([pts0, pts1], axis=1)
-
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         row = self.rows[idx]
-        rgb = self._load_rgb(row.rgb_path)
+        rgb, rgb_raw = self._load_rgb_pair(row.rgb_path)
         height = self._load_height(row.height_path)
         mask = self._load_mask(row.valid_mask_path)
+        person_mask = None
+        if row.person_mask_path and os.path.exists(row.person_mask_path):
+            person_mask = self._load_mask(row.person_mask_path)
 
         sample = {
             "image": torch.from_numpy(rgb),
+            "image_raw": torch.from_numpy(rgb_raw.copy()),
             "height": torch.from_numpy(height).unsqueeze(0),
             "mask": torch.from_numpy(mask).unsqueeze(0),
             "person_id": row.person_id,
             "camera_id": row.camera_id,
         }
+        if person_mask is not None:
+            sample["person_mask"] = torch.from_numpy(person_mask).unsqueeze(0)
 
         if self.use_pair_consistency:
             idx_pair = self._get_next_index(idx)
-            rgb_pair = self._load_rgb(self.rows[idx_pair].rgb_path)
+            row_pair = self.rows[idx_pair]
+            rgb_pair, rgb_pair_raw = self._load_rgb_pair(row_pair.rgb_path)
             sample["image_pair"] = torch.from_numpy(rgb_pair)
-            sample["matches"] = torch.from_numpy(self._load_matches(idx, idx_pair))
+            sample["image_pair_raw"] = torch.from_numpy(rgb_pair_raw.copy())
+            if row_pair.person_mask_path and os.path.exists(row_pair.person_mask_path):
+                person_mask_pair = self._load_mask(row_pair.person_mask_path)
+                sample["person_mask_pair"] = torch.from_numpy(person_mask_pair).unsqueeze(0)
 
         return sample

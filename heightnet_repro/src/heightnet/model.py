@@ -10,10 +10,10 @@ class ConvBlock(nn.Module):
         self.block = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

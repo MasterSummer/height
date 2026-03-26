@@ -1,0 +1,2324 @@
+{
+  "config": {
+    "data_root": "/data1/zhaoyd/heightnet_data_midrun_person_camera_split",
+    "score_stat": "p99"
+  },
+  "summary": {
+    "n_cameras": 9,
+    "n_test_person_total": 21,
+    "n_test_person_with_train_reference": 21,
+    "n_test_vs_train_pairs": 227,
+    "score_stat": "p99",
+    "pairwise_acc_vs_rank_labels_mean": 0.5030534280534281,
+    "test_vs_train_acc_vs_rank_labels_mean": 0.6075464658797992
+  },
+  "cameras": {
+    "300cm_inside": {
+      "n_train_person": 9,
+      "n_test_person": 2,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0313_man2",
+          "score_test": 0.035968883843584494,
+          "score_train": 2.574535600565098,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0313_man3",
+          "score_test": 0.035968883843584494,
+          "score_train": 2.96906343410755,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0319_woman2",
+          "score_test": 0.035968883843584494,
+          "score_train": 2.9329146669622053,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0320_woman3",
+          "score_test": 0.035968883843584494,
+          "score_train": 2.8086284354047955,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0320_woman4",
+          "score_test": 0.035968883843584494,
+          "score_train": 2.6603991369406383,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0324_woman3",
+          "score_test": 0.035968883843584494,
+          "score_train": 0.15759963570550706,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0324_woman4",
+          "score_test": 0.035968883843584494,
+          "score_train": 0.14788125430544216,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0326_woman2",
+          "score_test": 0.035968883843584494,
+          "score_train": 0.22333460406710703,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0321_woman2",
+          "train_person": "0327_woman1",
+          "score_test": 0.035968883843584494,
+          "score_train": 0.20461861033524786,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0313_man2",
+          "score_test": 0.24597948081075,
+          "score_train": 2.574535600565098,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0313_man3",
+          "score_test": 0.24597948081075,
+          "score_train": 2.96906343410755,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0319_woman2",
+          "score_test": 0.24597948081075,
+          "score_train": 2.9329146669622053,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman3",
+          "score_test": 0.24597948081075,
+          "score_train": 2.8086284354047955,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman4",
+          "score_test": 0.24597948081075,
+          "score_train": 2.6603991369406383,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman3",
+          "score_test": 0.24597948081075,
+          "score_train": 0.15759963570550706,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman4",
+          "score_test": 0.24597948081075,
+          "score_train": 0.14788125430544216,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman2",
+          "score_test": 0.24597948081075,
+          "score_train": 0.22333460406710703,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0327_woman1",
+          "score_test": 0.24597948081075,
+          "score_train": 0.20461861033524786,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0313_man3",
+          "score": 2.96906343410755,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 2.9329146669622053,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 2.8086284354047955,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 2.6603991369406383,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man2",
+          "score": 2.574535600565098,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.24597948081075,
+          "split": "test"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.22333460406710703,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.20461861033524786,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.15759963570550706,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.14788125430544216,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 0.035968883843584494,
+          "split": "test"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.509090909090909,
+      "pairwise_acc_vs_rank_labels_n_pairs": 55,
+      "test_vs_train_acc_vs_rank_labels": 0.4444444444444444,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 18
+    },
+    "300cm_outside": {
+      "n_train_person": 10,
+      "n_test_person": 3,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0313_man3",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.5754364465673765,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0319_woman1",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.9628065512293861,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0319_woman2",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.8060701015725065,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0321_woman2",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.5065399363636971,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman3",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.22385064489208162,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman4",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.1882841526530683,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman1",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.36907280318749447,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman4",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.4316560318834628,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0327_woman1",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.31236232121785484,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0327_woman2",
+          "score_test": 0.25012047389777853,
+          "score_train": 0.3085202248609167,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0313_man3",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.5754364465673765,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman1",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.9628065512293861,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman2",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.8060701015725065,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0321_woman2",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.5065399363636971,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_woman3",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.22385064489208162,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_woman4",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.1882841526530683,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman1",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.36907280318749447,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman4",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.4316560318834628,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0327_woman1",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.31236232121785484,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0327_woman2",
+          "score_test": 0.38526898870865506,
+          "score_train": 0.3085202248609167,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0313_man3",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.5754364465673765,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0319_woman1",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.9628065512293861,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0319_woman2",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.8060701015725065,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0321_woman2",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.5065399363636971,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0324_woman3",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.22385064489208162,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0324_woman4",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.1882841526530683,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0326_woman1",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.36907280318749447,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0326_woman4",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.4316560318834628,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0327_woman1",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.31236232121785484,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_man1",
+          "train_person": "0327_woman2",
+          "score_test": 0.3204602452926338,
+          "score_train": 0.3085202248609167,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0319_woman1",
+          "score": 0.9628065512293861,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 0.8060701015725065,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 0.5754364465673765,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 0.5065399363636971,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.4316560318834628,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 0.38526898870865506,
+          "split": "test"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.36907280318749447,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 0.3204602452926338,
+          "split": "test"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.31236232121785484,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.3085202248609167,
+          "split": "train"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 0.25012047389777853,
+          "split": "test"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.22385064489208162,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.1882841526530683,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.6410256410256411,
+      "pairwise_acc_vs_rank_labels_n_pairs": 78,
+      "test_vs_train_acc_vs_rank_labels": 0.5666666666666667,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 30
+    },
+    "300cm_slantside": {
+      "n_train_person": 12,
+      "n_test_person": 4,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0313_man3",
+          "train_person": "0313_man2",
+          "score_test": 0.19348370201759418,
+          "score_train": 2.3068181860120327,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0319_woman1",
+          "score_test": 0.19348370201759418,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0319_woman2",
+          "score_test": 0.19348370201759418,
+          "score_train": 3.0000000068119594,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0320_woman3",
+          "score_test": 0.19348370201759418,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0320_woman4",
+          "score_test": 0.19348370201759418,
+          "score_train": 3.000000007947286,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0321_woman2",
+          "score_test": 0.19348370201759418,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0324_man1",
+          "score_test": 0.19348370201759418,
+          "score_train": 2.999999992052714,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0324_woman3",
+          "score_test": 0.19348370201759418,
+          "score_train": 0.10157662095940288,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0324_woman4",
+          "score_test": 0.19348370201759418,
+          "score_train": 0.12934367121060325,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0326_woman1",
+          "score_test": 0.19348370201759418,
+          "score_train": 0.3861452456718932,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0327_woman1",
+          "score_test": 0.19348370201759418,
+          "score_train": 0.4015294787441862,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0327_woman2",
+          "score_test": 0.19348370201759418,
+          "score_train": 0.24021832037251442,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0313_man2",
+          "score_test": 0.1337936217780225,
+          "score_train": 2.3068181860120327,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0319_woman1",
+          "score_test": 0.1337936217780225,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0319_woman2",
+          "score_test": 0.1337936217780225,
+          "score_train": 3.0000000068119594,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0320_woman3",
+          "score_test": 0.1337936217780225,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0320_woman4",
+          "score_test": 0.1337936217780225,
+          "score_train": 3.000000007947286,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0321_woman2",
+          "score_test": 0.1337936217780225,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_man1",
+          "score_test": 0.1337936217780225,
+          "score_train": 2.999999992052714,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman3",
+          "score_test": 0.1337936217780225,
+          "score_train": 0.10157662095940288,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman4",
+          "score_test": 0.1337936217780225,
+          "score_train": 0.12934367121060325,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman1",
+          "score_test": 0.1337936217780225,
+          "score_train": 0.3861452456718932,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0327_woman1",
+          "score_test": 0.1337936217780225,
+          "score_train": 0.4015294787441862,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0327_woman2",
+          "score_test": 0.1337936217780225,
+          "score_train": 0.24021832037251442,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0313_man2",
+          "score_test": 0.20257559624117086,
+          "score_train": 2.3068181860120327,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0319_woman1",
+          "score_test": 0.20257559624117086,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0319_woman2",
+          "score_test": 0.20257559624117086,
+          "score_train": 3.0000000068119594,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0320_woman3",
+          "score_test": 0.20257559624117086,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0320_woman4",
+          "score_test": 0.20257559624117086,
+          "score_train": 3.000000007947286,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0321_woman2",
+          "score_test": 0.20257559624117086,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0324_man1",
+          "score_test": 0.20257559624117086,
+          "score_train": 2.999999992052714,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0324_woman3",
+          "score_test": 0.20257559624117086,
+          "score_train": 0.10157662095940288,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0324_woman4",
+          "score_test": 0.20257559624117086,
+          "score_train": 0.12934367121060325,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0326_woman1",
+          "score_test": 0.20257559624117086,
+          "score_train": 0.3861452456718932,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0327_woman1",
+          "score_test": 0.20257559624117086,
+          "score_train": 0.4015294787441862,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman2",
+          "train_person": "0327_woman2",
+          "score_test": 0.20257559624117086,
+          "score_train": 0.24021832037251442,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0313_man2",
+          "score_test": 0.32690921637254794,
+          "score_train": 2.3068181860120327,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0319_woman1",
+          "score_test": 0.32690921637254794,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0319_woman2",
+          "score_test": 0.32690921637254794,
+          "score_train": 3.0000000068119594,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0320_woman3",
+          "score_test": 0.32690921637254794,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0320_woman4",
+          "score_test": 0.32690921637254794,
+          "score_train": 3.000000007947286,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0321_woman2",
+          "score_test": 0.32690921637254794,
+          "score_train": 3.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0324_man1",
+          "score_test": 0.32690921637254794,
+          "score_train": 2.999999992052714,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0324_woman3",
+          "score_test": 0.32690921637254794,
+          "score_train": 0.10157662095940288,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0324_woman4",
+          "score_test": 0.32690921637254794,
+          "score_train": 0.12934367121060325,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0326_woman1",
+          "score_test": 0.32690921637254794,
+          "score_train": 0.3861452456718932,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0327_woman1",
+          "score_test": 0.32690921637254794,
+          "score_train": 0.4015294787441862,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0326_woman4",
+          "train_person": "0327_woman2",
+          "score_test": 0.32690921637254794,
+          "score_train": 0.24021832037251442,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0320_woman4",
+          "score": 3.000000007947286,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 3.0000000068119594,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 3.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 3.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 3.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 2.999999992052714,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man2",
+          "score": 2.3068181860120327,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.4015294787441862,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.3861452456718932,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.32690921637254794,
+          "split": "test"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.24021832037251442,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.20257559624117086,
+          "split": "test"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 0.19348370201759418,
+          "split": "test"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 0.1337936217780225,
+          "split": "test"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.12934367121060325,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.10157662095940288,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.5083333333333333,
+      "pairwise_acc_vs_rank_labels_n_pairs": 120,
+      "test_vs_train_acc_vs_rank_labels": 0.5416666666666666,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 48
+    },
+    "350cm_inside": {
+      "n_train_person": 10,
+      "n_test_person": 2,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0313_man2",
+          "score_test": 0.16888968462522314,
+          "score_train": 3.5000002128737315,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0313_man3",
+          "score_test": 0.16888968462522314,
+          "score_train": 3.500000050038467,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0318_woman3",
+          "score_test": 0.16888968462522314,
+          "score_train": 3.5000001745125684,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0319_woman2",
+          "score_test": 0.16888968462522314,
+          "score_train": 3.5000001911644465,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0321_woman2",
+          "score_test": 0.16888968462522314,
+          "score_train": 3.5,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0324_man1",
+          "score_test": 0.16888968462522314,
+          "score_train": 0.18344708965548004,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman1",
+          "score_test": 0.16888968462522314,
+          "score_train": 0.19501136595915472,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman2",
+          "score_test": 0.16888968462522314,
+          "score_train": 0.6054189407577117,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman4",
+          "score_test": 0.16888968462522314,
+          "score_train": 0.4404777114590009,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0327_woman2",
+          "score_test": 0.16888968462522314,
+          "score_train": 0.3382888943733027,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0313_man2",
+          "score_test": 0.09248180188766245,
+          "score_train": 3.5000002128737315,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0313_man3",
+          "score_test": 0.09248180188766245,
+          "score_train": 3.500000050038467,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0318_woman3",
+          "score_test": 0.09248180188766245,
+          "score_train": 3.5000001745125684,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0319_woman2",
+          "score_test": 0.09248180188766245,
+          "score_train": 3.5000001911644465,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0321_woman2",
+          "score_test": 0.09248180188766245,
+          "score_train": 3.5,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0324_man1",
+          "score_test": 0.09248180188766245,
+          "score_train": 0.18344708965548004,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0326_woman1",
+          "score_test": 0.09248180188766245,
+          "score_train": 0.19501136595915472,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0326_woman2",
+          "score_test": 0.09248180188766245,
+          "score_train": 0.6054189407577117,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0326_woman4",
+          "score_test": 0.09248180188766245,
+          "score_train": 0.4404777114590009,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman3",
+          "train_person": "0327_woman2",
+          "score_test": 0.09248180188766245,
+          "score_train": 0.3382888943733027,
+          "pred_test_taller": 0
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0313_man2",
+          "score": 3.5000002128737315,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 3.5000001911644465,
+          "split": "train"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 3.5000001745125684,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 3.500000050038467,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 3.5,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.6054189407577117,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.4404777114590009,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.3382888943733027,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.19501136595915472,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 0.18344708965548004,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 0.16888968462522314,
+          "split": "test"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 0.09248180188766245,
+          "split": "test"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.5606060606060606,
+      "pairwise_acc_vs_rank_labels_n_pairs": 66,
+      "test_vs_train_acc_vs_rank_labels": 0.75,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 20
+    },
+    "350cm_outside": {
+      "n_train_person": 14,
+      "n_test_person": 1,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0313_man2",
+          "score_test": 0.22081128397564354,
+          "score_train": 3.2837976697952516,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0313_man3",
+          "score_test": 0.22081128397564354,
+          "score_train": 2.811320886015892,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0319_woman1",
+          "score_test": 0.22081128397564354,
+          "score_train": 2.9395006582385204,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0319_woman2",
+          "score_test": 0.22081128397564354,
+          "score_train": 2.7244200144721344,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0320_woman3",
+          "score_test": 0.22081128397564354,
+          "score_train": 3.167647683137172,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0320_woman4",
+          "score_test": 0.22081128397564354,
+          "score_train": 3.2379358053207397,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0321_woman2",
+          "score_test": 0.22081128397564354,
+          "score_train": 3.086305336157481,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0324_man1",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.2036262420937419,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0324_woman4",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.4907026938473185,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0326_woman1",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.491143093608758,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0326_woman2",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.4411604038750132,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0326_woman4",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.39546547705928486,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0327_woman1",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.19784285385339034,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0324_woman3",
+          "train_person": "0327_woman2",
+          "score_test": 0.22081128397564354,
+          "score_train": 0.47599863557744837,
+          "pred_test_taller": 0
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0313_man2",
+          "score": 3.2837976697952516,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 3.2379358053207397,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 3.167647683137172,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 3.086305336157481,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 2.9395006582385204,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 2.811320886015892,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 2.7244200144721344,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.491143093608758,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.4907026938473185,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.47599863557744837,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.4411604038750132,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.39546547705928486,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.22081128397564354,
+          "split": "test"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 0.2036262420937419,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.19784285385339034,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.5047619047619047,
+      "pairwise_acc_vs_rank_labels_n_pairs": 105,
+      "test_vs_train_acc_vs_rank_labels": 0.7142857142857143,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 14
+    },
+    "350cm_slantside": {
+      "n_train_person": 13,
+      "n_test_person": 1,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0313_man2",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.500000004584973,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0318_woman3",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.500000053981565,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0319_woman1",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.5000000822711996,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0319_woman2",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.5000001062260995,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman3",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.5000000128874906,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman4",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.5000000469612353,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0321_woman2",
+          "score_test": 0.1283476707835992,
+          "score_train": 3.5,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_man1",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.9045776296406984,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman3",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.3915109407217776,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman4",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.24502074426660936,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman1",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.15475528715178372,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman4",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.272322274496158,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0327_woman1",
+          "score_test": 0.1283476707835992,
+          "score_train": 0.1466560035363817,
+          "pred_test_taller": 0
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0319_woman2",
+          "score": 3.5000001062260995,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 3.5000000822711996,
+          "split": "train"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 3.500000053981565,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 3.5000000469612353,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 3.5000000128874906,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man2",
+          "score": 3.500000004584973,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 3.5,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 0.9045776296406984,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.3915109407217776,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.272322274496158,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.24502074426660936,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.15475528715178372,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.1466560035363817,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.1283476707835992,
+          "split": "test"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.5384615384615384,
+      "pairwise_acc_vs_rank_labels_n_pairs": 91,
+      "test_vs_train_acc_vs_rank_labels": 0.9230769230769231,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 13
+    },
+    "400cm_inside": {
+      "n_train_person": 9,
+      "n_test_person": 4,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0313_man2",
+          "train_person": "0320_woman3",
+          "score_test": 0.8540357916127527,
+          "score_train": 3.9783718292529766,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0320_woman4",
+          "score_test": 0.8540357916127527,
+          "score_train": 3.911258418743427,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0321_woman2",
+          "score_test": 0.8540357916127527,
+          "score_train": 3.836660395234318,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0324_woman3",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.24223051839508117,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0324_woman4",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.15984739211077492,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman1",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.16162279803926746,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman2",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.08644329288583849,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman4",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.18050129765358108,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0327_woman1",
+          "score_test": 0.8540357916127527,
+          "score_train": 0.07311325771734119,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0320_woman3",
+          "score_test": 0.207697242298207,
+          "score_train": 3.9783718292529766,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0320_woman4",
+          "score_test": 0.207697242298207,
+          "score_train": 3.911258418743427,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0321_woman2",
+          "score_test": 0.207697242298207,
+          "score_train": 3.836660395234318,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman3",
+          "score_test": 0.207697242298207,
+          "score_train": 0.24223051839508117,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0324_woman4",
+          "score_test": 0.207697242298207,
+          "score_train": 0.15984739211077492,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman1",
+          "score_test": 0.207697242298207,
+          "score_train": 0.16162279803926746,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman2",
+          "score_test": 0.207697242298207,
+          "score_train": 0.08644329288583849,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0326_woman4",
+          "score_test": 0.207697242298207,
+          "score_train": 0.18050129765358108,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0318_woman3",
+          "train_person": "0327_woman1",
+          "score_test": 0.207697242298207,
+          "score_train": 0.07311325771734119,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0320_woman3",
+          "score_test": 0.39441514040277353,
+          "score_train": 3.9783718292529766,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0320_woman4",
+          "score_test": 0.39441514040277353,
+          "score_train": 3.911258418743427,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0321_woman2",
+          "score_test": 0.39441514040277353,
+          "score_train": 3.836660395234318,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0324_woman3",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.24223051839508117,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0324_woman4",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.15984739211077492,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman1",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.16162279803926746,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman2",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.08644329288583849,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0326_woman4",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.18050129765358108,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0319_woman1",
+          "train_person": "0327_woman1",
+          "score_test": 0.39441514040277353,
+          "score_train": 0.07311325771734119,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman3",
+          "score_test": 0.17498375965903204,
+          "score_train": 3.9783718292529766,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0320_woman4",
+          "score_test": 0.17498375965903204,
+          "score_train": 3.911258418743427,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0321_woman2",
+          "score_test": 0.17498375965903204,
+          "score_train": 3.836660395234318,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman3",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.24223051839508117,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0324_woman4",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.15984739211077492,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman1",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.16162279803926746,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman2",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.08644329288583849,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0326_woman4",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.18050129765358108,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0327_woman2",
+          "train_person": "0327_woman1",
+          "score_test": 0.17498375965903204,
+          "score_train": 0.07311325771734119,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0320_woman3",
+          "score": 3.9783718292529766,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 3.911258418743427,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 3.836660395234318,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man2",
+          "score": 0.8540357916127527,
+          "split": "test"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 0.39441514040277353,
+          "split": "test"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.24223051839508117,
+          "split": "train"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 0.207697242298207,
+          "split": "test"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.18050129765358108,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.17498375965903204,
+          "split": "test"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.16162279803926746,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.15984739211077492,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.08644329288583849,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.07311325771734119,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.3333333333333333,
+      "pairwise_acc_vs_rank_labels_n_pairs": 78,
+      "test_vs_train_acc_vs_rank_labels": 0.3888888888888889,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 36
+    },
+    "400cm_outside": {
+      "n_train_person": 12,
+      "n_test_person": 3,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0313_man2",
+          "train_person": "0318_woman3",
+          "score_test": 0.2438076058347874,
+          "score_train": 3.6176620082509134,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0319_woman1",
+          "score_test": 0.2438076058347874,
+          "score_train": 3.6671726395574846,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0319_woman2",
+          "score_test": 0.2438076058347874,
+          "score_train": 3.7571531091417585,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0320_woman3",
+          "score_test": 0.2438076058347874,
+          "score_train": 3.768634071990625,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0321_woman2",
+          "score_test": 0.2438076058347874,
+          "score_train": 3.8572114149729413,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0324_man1",
+          "score_test": 0.2438076058347874,
+          "score_train": 1.7280088932283464,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0324_woman3",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.2656719323131256,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman1",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.27647064421325923,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman2",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.13578852855910858,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0326_woman4",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.282159847052147,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0327_woman1",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.3941526006468955,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man2",
+          "train_person": "0327_woman2",
+          "score_test": 0.2438076058347874,
+          "score_train": 0.3261722100277742,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0318_woman3",
+          "score_test": 0.23212763803861178,
+          "score_train": 3.6176620082509134,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0319_woman1",
+          "score_test": 0.23212763803861178,
+          "score_train": 3.6671726395574846,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0319_woman2",
+          "score_test": 0.23212763803861178,
+          "score_train": 3.7571531091417585,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0320_woman3",
+          "score_test": 0.23212763803861178,
+          "score_train": 3.768634071990625,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0321_woman2",
+          "score_test": 0.23212763803861178,
+          "score_train": 3.8572114149729413,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0324_man1",
+          "score_test": 0.23212763803861178,
+          "score_train": 1.7280088932283464,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0324_woman3",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.2656719323131256,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0326_woman1",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.27647064421325923,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0326_woman2",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.13578852855910858,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0326_woman4",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.282159847052147,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0327_woman1",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.3941526006468955,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0313_man3",
+          "train_person": "0327_woman2",
+          "score_test": 0.23212763803861178,
+          "score_train": 0.3261722100277742,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0318_woman3",
+          "score_test": 0.46181968321663236,
+          "score_train": 3.6176620082509134,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman1",
+          "score_test": 0.46181968321663236,
+          "score_train": 3.6671726395574846,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman2",
+          "score_test": 0.46181968321663236,
+          "score_train": 3.7571531091417585,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0320_woman3",
+          "score_test": 0.46181968321663236,
+          "score_train": 3.768634071990625,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0321_woman2",
+          "score_test": 0.46181968321663236,
+          "score_train": 3.8572114149729413,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_man1",
+          "score_test": 0.46181968321663236,
+          "score_train": 1.7280088932283464,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_woman3",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.2656719323131256,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman1",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.27647064421325923,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman2",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.13578852855910858,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman4",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.282159847052147,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0327_woman1",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.3941526006468955,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0327_woman2",
+          "score_test": 0.46181968321663236,
+          "score_train": 0.3261722100277742,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0321_woman2",
+          "score": 3.8572114149729413,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman3",
+          "score": 3.768634071990625,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 3.7571531091417585,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 3.6671726395574846,
+          "split": "train"
+        },
+        {
+          "person_id": "0318_woman3",
+          "score": 3.6176620082509134,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 1.7280088932283464,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 0.46181968321663236,
+          "split": "test"
+        },
+        {
+          "person_id": "0327_woman1",
+          "score": 0.3941526006468955,
+          "split": "train"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.3261722100277742,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.282159847052147,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.27647064421325923,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.2656719323131256,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man2",
+          "score": 0.2438076058347874,
+          "split": "test"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 0.23212763803861178,
+          "split": "test"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.13578852855910858,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.41904761904761906,
+      "pairwise_acc_vs_rank_labels_n_pairs": 105,
+      "test_vs_train_acc_vs_rank_labels": 0.3055555555555556,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 36
+    },
+    "400cm_slantside": {
+      "n_train_person": 12,
+      "n_test_person": 1,
+      "test_vs_train_pairwise": [
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0313_man2",
+          "score_test": 0.24704422579417307,
+          "score_train": 4.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0313_man3",
+          "score_test": 0.24704422579417307,
+          "score_train": 4.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman1",
+          "score_test": 0.24704422579417307,
+          "score_train": 4.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0319_woman2",
+          "score_test": 0.24704422579417307,
+          "score_train": 4.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0321_woman2",
+          "score_test": 0.24704422579417307,
+          "score_train": 4.0,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_man1",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.17030590772628784,
+          "pred_test_taller": 1
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_woman3",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.4688467336818576,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0324_woman4",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.2824935679981375,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman1",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.32568458952009677,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman2",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.27441722775110977,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0326_woman4",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.3862674806267023,
+          "pred_test_taller": 0
+        },
+        {
+          "test_person": "0320_woman4",
+          "train_person": "0327_woman2",
+          "score_test": 0.24704422579417307,
+          "score_train": 0.18103640328133794,
+          "pred_test_taller": 1
+        }
+      ],
+      "merged_ranking": [
+        {
+          "person_id": "0313_man2",
+          "score": 4.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0313_man3",
+          "score": 4.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman1",
+          "score": 4.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0319_woman2",
+          "score": 4.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0321_woman2",
+          "score": 4.0,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman3",
+          "score": 0.4688467336818576,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman4",
+          "score": 0.3862674806267023,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman1",
+          "score": 0.32568458952009677,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_woman4",
+          "score": 0.2824935679981375,
+          "split": "train"
+        },
+        {
+          "person_id": "0326_woman2",
+          "score": 0.27441722775110977,
+          "split": "train"
+        },
+        {
+          "person_id": "0320_woman4",
+          "score": 0.24704422579417307,
+          "split": "test"
+        },
+        {
+          "person_id": "0327_woman2",
+          "score": 0.18103640328133794,
+          "split": "train"
+        },
+        {
+          "person_id": "0324_man1",
+          "score": 0.17030590772628784,
+          "split": "train"
+        }
+      ],
+      "pairwise_acc_vs_rank_labels": 0.5128205128205128,
+      "pairwise_acc_vs_rank_labels_n_pairs": 78,
+      "test_vs_train_acc_vs_rank_labels": 0.8333333333333334,
+      "test_vs_train_acc_vs_rank_labels_n_pairs": 12
+    }
+  }
+}
