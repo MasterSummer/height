@@ -13,6 +13,18 @@ import numpy as np
 import torch
 
 
+def _torch_load_compat(
+    path: str,
+    map_location: str | torch.device,
+    *,
+    weights_only: bool,
+):
+    try:
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
+
 def parse_args() -> argparse.Namespace:
     repo_root = Path(__file__).resolve().parents[3]
     parser = argparse.ArgumentParser(
@@ -61,7 +73,7 @@ def build_model(encoder: str, checkpoint: Path):
         "vitg": {"encoder": "vitg", "features": 384, "out_channels": [1536, 1536, 1536, 1536]},
     }
     model = DepthAnythingV2(**model_configs[encoder])
-    state_dict = torch.load(str(checkpoint), map_location="cpu")
+    state_dict = _torch_load_compat(str(checkpoint), map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     return model.to(device).eval(), device

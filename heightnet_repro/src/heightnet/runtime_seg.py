@@ -7,6 +7,21 @@ import numpy as np
 import torch
 
 
+def select_largest_person_mask(arr: np.ndarray, h: int, w: int) -> np.ndarray:
+    pm = np.zeros((h, w), dtype=np.uint8)
+    if arr.size == 0:
+        return pm
+
+    best_area = -1
+    for m in arr:
+        mu8 = (m > 0.5).astype(np.uint8)
+        area = int(mu8.sum())
+        if area > best_area:
+            best_area = area
+            pm = mu8
+    return pm
+
+
 class PersonSegmenter:
     def __init__(
         self,
@@ -40,11 +55,17 @@ class PersonSegmenter:
 
         b, _, h, w = images_raw.shape
         imgs = [images_raw[i].permute(1, 2, 0).cpu().numpy() for i in range(b)]
+        if device.type == "cuda":
+            infer_device = str(device.index if device.index is not None else 0)
+        else:
+            infer_device = device.type
+
         results = self.model.predict(
             source=imgs,
             conf=self.conf,
             iou=self.iou,
             imgsz=self.imgsz,
+            device=infer_device,
             classes=[0],  # person
             retina_masks=True,
             verbose=False,
@@ -52,10 +73,11 @@ class PersonSegmenter:
 
         masks = []
         for i in range(b):
-            pm = np.zeros((h, w), dtype=np.uint8)
             r = results[i]
+            pm = np.zeros((h, w), dtype=np.uint8)
             if getattr(r, "masks", None) is not None and r.masks.data is not None:
                 arr = r.masks.data.detach().cpu().numpy()
+                resized = []
                 for m in arr:
                     mu8 = (m > 0.5).astype(np.uint8)
                     if mu8.shape != (h, w):
@@ -66,6 +88,8 @@ class PersonSegmenter:
                         import cv2
 
                         mu8 = cv2.resize(mu8, (w, h), interpolation=cv2.INTER_NEAREST)
-                    pm = np.maximum(pm, mu8)
+                    resized.append(mu8)
+                if resized:
+                    pm = select_largest_person_mask(np.stack(resized, axis=0), h, w)
             masks.append(torch.from_numpy(pm.astype(np.float32)).unsqueeze(0))
         return torch.stack(masks, dim=0).to(device)

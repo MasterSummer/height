@@ -9,10 +9,14 @@ import yaml
 
 @dataclass
 class PathsConfig:
-    train_manifest: str
-    val_manifest: str
-    test_manifest: str
-    output_dir: str
+    train_manifest: str = ""
+    val_manifest: str = ""
+    test_manifest: str = ""
+    train_video_root: str = ""
+    val_video_root: str = ""
+    test_video_root: str = ""
+    bg_depth_root: str = ""
+    output_dir: str = ""
 
 
 @dataclass
@@ -31,13 +35,13 @@ class TrainConfig:
 
 @dataclass
 class LossConfig:
-    silog_lambda: float
-    consistency_weight: float
-    consistency_warmup_epochs: int
-    pairwise_weight: float = 0.0
-    pairwise_enabled: bool = False
-    pairwise_json: str = ""
-    pairwise_warmup_epochs: int = 0
+    lambda_rmse: float
+    lambda_rank: float
+    lambda_cons: float
+    eps: float
+    min_valid_pixels: int
+    min_valid_ratio: float
+    pairwise_json: str
 
 
 @dataclass
@@ -45,19 +49,23 @@ class DataConfig:
     image_size: List[int]
     normalize_rgb: bool
     use_pair_consistency: bool
-    max_matches: int
 
 
 @dataclass
 class ModelConfig:
     name: str
     base_channels: int
+    comparator_channels: int = 16
 
 
 @dataclass
 class EvalConfig:
     save_visualizations: bool
     vis_limit: int
+    video_feature_frames: int = 8
+    save_train_gallery: bool = True
+    frames_per_person_eval: int = 10
+    frame_eval_seed: int = 42
 
 
 @dataclass
@@ -71,6 +79,16 @@ class RuntimeSegConfig:
 
 
 @dataclass
+class RuntimeDepthConfig:
+    enabled: bool
+    depthanything_root: str
+    encoder: str
+    checkpoint: str
+    input_size: int
+    assume_inverse: bool = False
+
+
+@dataclass
 class Config:
     seed: int
     device: str
@@ -81,6 +99,7 @@ class Config:
     model: ModelConfig
     eval: EvalConfig
     runtime_seg: RuntimeSegConfig
+    runtime_depth: RuntimeDepthConfig
 
 
 def _to_abs(base_dir: str, path: str) -> str:
@@ -97,15 +116,53 @@ def load_config(path: str) -> Config:
     workspace = os.path.dirname(base_dir)
 
     paths = PathsConfig(
-        train_manifest=_to_abs(workspace, raw["paths"]["train_manifest"]),
-        val_manifest=_to_abs(workspace, raw["paths"]["val_manifest"]),
-        test_manifest=_to_abs(workspace, raw["paths"]["test_manifest"]),
+        train_manifest=_to_abs(workspace, raw["paths"]["train_manifest"]) if raw["paths"].get("train_manifest") else "",
+        val_manifest=_to_abs(workspace, raw["paths"]["val_manifest"]) if raw["paths"].get("val_manifest") else "",
+        test_manifest=_to_abs(workspace, raw["paths"]["test_manifest"]) if raw["paths"].get("test_manifest") else "",
+        train_video_root=_to_abs(workspace, raw["paths"]["train_video_root"]) if raw["paths"].get("train_video_root") else "",
+        val_video_root=_to_abs(workspace, raw["paths"]["val_video_root"]) if raw["paths"].get("val_video_root") else "",
+        test_video_root=_to_abs(workspace, raw["paths"]["test_video_root"]) if raw["paths"].get("test_video_root") else "",
+        bg_depth_root=_to_abs(workspace, raw["paths"]["bg_depth_root"]) if raw["paths"].get("bg_depth_root") else "",
         output_dir=_to_abs(workspace, raw["paths"]["output_dir"]),
     )
 
     loss_raw = dict(raw["loss"])
     if loss_raw.get("pairwise_json"):
         loss_raw["pairwise_json"] = _to_abs(workspace, loss_raw["pairwise_json"])
+
+    runtime_seg_raw = raw.get(
+        "runtime_seg",
+        {
+            "enabled": True,
+            "model_path": "",
+            "conf": 0.25,
+            "iou": 0.7,
+            "imgsz": 640,
+            "strict_native": True,
+        },
+    )
+    runtime_depth_raw = raw.get(
+        "runtime_depth",
+        {
+            "enabled": False,
+            "depthanything_root": "",
+            "encoder": "vitl",
+            "checkpoint": "",
+            "input_size": 518,
+            "assume_inverse": False,
+        },
+    )
+    if runtime_depth_raw.get("depthanything_root"):
+        runtime_depth_raw["depthanything_root"] = _to_abs(workspace, runtime_depth_raw["depthanything_root"])
+    if runtime_depth_raw.get("checkpoint"):
+        runtime_depth_raw["checkpoint"] = _to_abs(workspace, runtime_depth_raw["checkpoint"])
+    runtime_depth_raw.setdefault("assume_inverse", False)
+
+    eval_raw = dict(raw["eval"])
+    eval_raw.setdefault("video_feature_frames", 8)
+    eval_raw.setdefault("save_train_gallery", True)
+    eval_raw.setdefault("frames_per_person_eval", 10)
+    eval_raw.setdefault("frame_eval_seed", 42)
 
     return Config(
         seed=raw["seed"],
@@ -115,13 +172,7 @@ def load_config(path: str) -> Config:
         loss=LossConfig(**loss_raw),
         data=DataConfig(**raw["data"]),
         model=ModelConfig(**raw["model"]),
-        eval=EvalConfig(**raw["eval"]),
-        runtime_seg=RuntimeSegConfig(**raw.get("runtime_seg", {
-            "enabled": False,
-            "model_path": "",
-            "conf": 0.25,
-            "iou": 0.7,
-            "imgsz": 640,
-            "strict_native": True,
-        })),
+        eval=EvalConfig(**eval_raw),
+        runtime_seg=RuntimeSegConfig(**runtime_seg_raw),
+        runtime_depth=RuntimeDepthConfig(**runtime_depth_raw),
     )

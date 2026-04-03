@@ -120,10 +120,10 @@ def main() -> None:
             args.data_root,
             "--split",
             "all",
-            "--matches-root",
-            args.matches_root,
             "--out-dir",
             args.out_dir,
+            "--bg-depth-root",
+            args.bg_depth_root,
             "--allow-empty-split",
         ]
     )

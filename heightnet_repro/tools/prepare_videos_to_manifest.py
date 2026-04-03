@@ -12,6 +12,18 @@ import numpy as np
 import torch
 
 
+def _torch_load_compat(
+    path: str,
+    map_location: str | torch.device,
+    *,
+    weights_only: bool,
+):
+    try:
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
+
 def run(cmd: list[str]) -> None:
     print("+", " ".join(cmd))
     subprocess.run(cmd, check=True)
@@ -117,7 +129,7 @@ def build_depth_model(depth_root: Path, encoder: str, checkpoint: Path):
         "vitg": {"encoder": "vitg", "features": 384, "out_channels": [1536, 1536, 1536, 1536]},
     }
     model = DepthAnythingV2(**model_configs[encoder])
-    state_dict = torch.load(str(checkpoint), map_location="cpu")
+    state_dict = _torch_load_compat(str(checkpoint), map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
     device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     model = model.to(device).eval()

@@ -9,64 +9,101 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def silog_loss(
-    pred: torch.Tensor,
-    target: torch.Tensor,
-    valid_mask: torch.Tensor,
-    lambd: float = 0.85,
-    eps: float = 1e-6,
-) -> torch.Tensor:
-    """Scale-invariant log loss, adapted for positive-valued height maps."""
-    mask = valid_mask > 0.5
-    pred_valid = torch.clamp(pred[mask], min=eps)
-    target_valid = torch.clamp(target[mask], min=eps)
-
-    if pred_valid.numel() == 0:
+def masked_rmse(pred: torch.Tensor, target: torch.Tensor, valid_mask: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    m = valid_mask > 0.5
+    if m.sum() == 0:
         return pred.new_tensor(0.0)
+    err2 = (pred - target) ** 2
+    num = err2[m].sum()
+    den = m.float().sum() + eps
+    return torch.sqrt(num / den + eps)
 
-    d = torch.log(pred_valid) - torch.log(target_valid)
-    return torch.sqrt(torch.mean(d * d) - lambd * torch.mean(d) * torch.mean(d) + eps)
+
+def masked_avg_pool(x: torch.Tensor, mask: torch.Tensor, eps: float = 1e-6) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    m = (mask > 0.5).float()
+    cnt = m.flatten(1).sum(dim=1)
+    val = (x * m).flatten(1).sum(dim=1)
+    avg = val / (cnt + eps)
+    ratio = cnt / float(x.shape[-2] * x.shape[-1])
+    return avg, cnt, ratio
 
 
-def _masked_max_score(
-    pred0: torch.Tensor,
-    person_mask0: torch.Tensor,
+def person_mask_is_valid(
+    mask: torch.Tensor,
+    min_valid_pixels: int,
+    min_valid_ratio: float,
 ) -> torch.Tensor:
-    m0 = person_mask0 > 0.5
-    if m0.sum() == 0:
-        return pred0.new_tensor(0.0)
-    v0 = pred0[m0]
-    return torch.max(v0)
+    m = (mask > 0.5).float()
+    cnt = m.flatten(1).sum(dim=1)
+    ratio = cnt / float(mask.shape[-2] * mask.shape[-1])
+    return (cnt >= float(min_valid_pixels)) & (ratio >= float(min_valid_ratio))
 
 
-def consistency_loss(
-    pred0: torch.Tensor,
-    pred1: torch.Tensor,
-    person_mask0: torch.Tensor,
-    person_mask1: torch.Tensor,
-) -> torch.Tensor:
-    """L1 consistency on masked max height score across adjacent frames."""
-    s0 = _masked_max_score(pred0, person_mask0)
-    s1 = _masked_max_score(pred1, person_mask1)
-    return torch.abs(s0 - s1)
+def build_rank_pairs(
+    person_ids: List[str],
+    camera_ids: List[str],
+    person_masks: torch.Tensor,
+    pairwise_labels: Dict[str, Dict[Tuple[str, str], int]],
+    min_valid_pixels: int,
+    min_valid_ratio: float,
+    device: torch.device,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    valid_person = person_mask_is_valid(person_masks, min_valid_pixels=min_valid_pixels, min_valid_ratio=min_valid_ratio)
+    idx_i: List[int] = []
+    idx_j: List[int] = []
+    y: List[float] = []
+
+    n = len(person_ids)
+    for i in range(n):
+        if not bool(valid_person[i].item()):
+            continue
+        for j in range(i + 1, n):
+            if camera_ids[i] != camera_ids[j]:
+                continue
+            if not bool(valid_person[j].item()):
+                continue
+            cam = camera_ids[i]
+            labels_cam = pairwise_labels.get(cam, {})
+            key = (person_ids[i], person_ids[j])
+            if key not in labels_cam:
+                continue
+            idx_i.append(i)
+            idx_j.append(j)
+            y.append(float(labels_cam[key]))
+
+    if not y:
+        z = torch.empty((0,), dtype=torch.long, device=device)
+        return z, z, torch.empty((0,), dtype=torch.float32, device=device)
+
+    return (
+        torch.tensor(idx_i, dtype=torch.long, device=device),
+        torch.tensor(idx_j, dtype=torch.long, device=device),
+        torch.tensor(y, dtype=torch.float32, device=device),
+    )
 
 
 class HeightNetLoss(nn.Module):
     def __init__(
         self,
-        silog_lambda: float = 0.85,
-        consistency_weight: float = 0.1,
-        pairwise_weight: float = 0.0,
-        pairwise_json: str = "",
+        lambda_rmse: float,
+        lambda_rank: float,
+        lambda_cons: float,
+        eps: float,
+        min_valid_pixels: int,
+        min_valid_ratio: float,
     ) -> None:
         super().__init__()
-        self.silog_lambda = silog_lambda
-        self.consistency_weight = consistency_weight
-        self.pairwise_weight = pairwise_weight
-        self.pairwise_labels = self._load_pairwise_labels(pairwise_json) if pairwise_json else {}
+        self.lambda_rmse = lambda_rmse
+        self.lambda_rank = lambda_rank
+        self.lambda_cons = lambda_cons
+        self.eps = eps
+        self.min_valid_pixels = int(min_valid_pixels)
+        self.min_valid_ratio = float(min_valid_ratio)
+        self.bce = nn.BCEWithLogitsLoss()
+        self.smooth_l1 = nn.SmoothL1Loss(reduction="none")
 
     @staticmethod
-    def _load_pairwise_labels(path: str) -> Dict[str, Dict[Tuple[str, str], int]]:
+    def load_pairwise_labels(path: str) -> Dict[str, Dict[Tuple[str, str], int]]:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         labels: Dict[str, Dict[Tuple[str, str], int]] = defaultdict(dict)
@@ -79,84 +116,59 @@ class HeightNetLoss(nn.Module):
             labels[cam][(j, i)] = 1 - y
         return dict(labels)
 
-    @staticmethod
-    def masked_max_scores(pred: torch.Tensor, person_mask: torch.Tensor) -> torch.Tensor:
-        scores: List[torch.Tensor] = []
-        for i in range(pred.shape[0]):
-            scores.append(_masked_max_score(pred[i : i + 1], person_mask[i : i + 1]))
-        return torch.stack(scores, dim=0)
-
-    def pairwise_loss(
+    def consistency_loss(
         self,
-        scores: torch.Tensor,
-        person_ids: List[str],
-        camera_ids: List[str],
-    ) -> torch.Tensor:
-        terms: List[torch.Tensor] = []
-        for i in range(len(person_ids)):
-            for j in range(i + 1, len(person_ids)):
-                if camera_ids[i] != camera_ids[j]:
-                    continue
-                if person_ids[i] == person_ids[j]:
-                    continue
-                label_map = self.pairwise_labels.get(camera_ids[i], {})
-                key = (person_ids[i], person_ids[j])
-                if key not in label_map:
-                    continue
-                y = float(label_map[key])
-                delta = scores[i] - scores[j]
-                target = scores.new_tensor(1.0 if y > 0.5 else -1.0)
-                terms.append(F.softplus(-target * delta))
-        if not terms:
-            return scores.new_tensor(0.0)
-        return torch.stack(terms).mean()
+        pred_t: torch.Tensor,
+        pred_t1: torch.Tensor,
+        mask_t: torch.Tensor,
+        mask_t1: torch.Tensor,
+    ) -> tuple[torch.Tensor, int]:
+        s_t, cnt_t, ratio_t = masked_avg_pool(pred_t, mask_t, eps=self.eps)
+        s_t1, cnt_t1, ratio_t1 = masked_avg_pool(pred_t1, mask_t1, eps=self.eps)
+
+        valid = (
+            (cnt_t >= self.min_valid_pixels)
+            & (cnt_t1 >= self.min_valid_pixels)
+            & (ratio_t >= self.min_valid_ratio)
+            & (ratio_t1 >= self.min_valid_ratio)
+        )
+        if valid.sum().item() == 0:
+            return pred_t.new_tensor(0.0), 0
+
+        raw = self.smooth_l1(s_t, s_t1)
+        return raw[valid].mean(), int(valid.sum().item())
+
+    def rank_loss(
+        self,
+        pair_logit: torch.Tensor | None,
+        pair_label: torch.Tensor | None,
+        ref: torch.Tensor,
+    ) -> tuple[torch.Tensor, int]:
+        if pair_logit is None or pair_label is None or pair_logit.numel() == 0:
+            return ref.new_tensor(0.0), 0
+        return self.bce(pair_logit, pair_label.float()), int(pair_label.numel())
 
     def forward(
         self,
-        pred: torch.Tensor,
-        target: torch.Tensor,
-        mask: torch.Tensor,
-        pred_pair: torch.Tensor | None = None,
-        person_mask: torch.Tensor | None = None,
-        person_mask_pair: torch.Tensor | None = None,
-        person_ids: List[str] | None = None,
-        camera_ids: List[str] | None = None,
-        enable_pairwise: bool = False,
-        enable_consistency: bool = False,
+        pred_height: torch.Tensor,
+        target_height: torch.Tensor,
+        valid_mask: torch.Tensor,
+        pred_pair: torch.Tensor,
+        person_mask: torch.Tensor,
+        person_mask_pair: torch.Tensor,
+        pair_logit: torch.Tensor | None,
+        pair_label: torch.Tensor | None,
     ) -> dict:
-        l_silog = silog_loss(pred, target, mask, lambd=self.silog_lambda)
-        l_cons = pred.new_tensor(0.0)
-        l_pair = pred.new_tensor(0.0)
+        l_rmse = masked_rmse(pred_height, target_height, valid_mask, eps=self.eps)
+        l_cons, cons_valid_pairs = self.consistency_loss(pred_height, pred_pair, person_mask, person_mask_pair)
+        l_rank, rank_pairs = self.rank_loss(pair_logit, pair_label, ref=pred_height)
 
-        if (
-            enable_consistency
-            and pred_pair is not None
-            and person_mask is not None
-            and person_mask_pair is not None
-        ):
-            batch_losses = []
-            for i in range(pred.shape[0]):
-                batch_losses.append(
-                    consistency_loss(
-                        pred[i : i + 1],
-                        pred_pair[i : i + 1],
-                        person_mask[i : i + 1],
-                        person_mask_pair[i : i + 1],
-                    )
-                )
-            if batch_losses:
-                l_cons = torch.stack(batch_losses).mean()
-
-        if (
-            enable_pairwise
-            and person_mask is not None
-            and person_ids is not None
-            and camera_ids is not None
-            and self.pairwise_weight > 0.0
-            and self.pairwise_labels
-        ):
-            scores = self.masked_max_scores(pred, person_mask)
-            l_pair = self.pairwise_loss(scores, person_ids, camera_ids)
-
-        total = l_silog + self.consistency_weight * l_cons + self.pairwise_weight * l_pair
-        return {"total": total, "silog": l_silog, "consistency": l_cons, "pairwise": l_pair}
+        total = self.lambda_rmse * l_rmse + self.lambda_rank * l_rank + self.lambda_cons * l_cons
+        return {
+            "total": total,
+            "rmse": l_rmse,
+            "rank": l_rank,
+            "consistency": l_cons,
+            "cons_valid_pairs": cons_valid_pairs,
+            "rank_pairs": rank_pairs,
+        }

@@ -20,6 +20,18 @@ from heightnet.runtime_seg import PersonSegmenter
 from heightnet.utils import ensure_dir
 
 
+def _torch_load_compat(
+    path: str,
+    map_location: str | torch.device,
+    *,
+    weights_only: bool,
+):
+    try:
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
+
+
 def _require_file(path: str, name: str) -> None:
     if not os.path.exists(path):
         raise FileNotFoundError(f"{name} not found: {path}")
@@ -53,24 +65,21 @@ def _extract_scores(
     with torch.no_grad():
         for batch in loader:
             image = batch["image"].to(device)
-            pred = model(image)
+            pred = model(image)["pred_height_map"]
 
             if segmenter is not None:
                 if "image_raw" not in batch:
                     continue
                 person_mask = segmenter.infer_batch(batch["image_raw"], device)
             else:
-                person_mask = batch.get("person_mask")
-                if person_mask is None:
-                    continue
-                person_mask = person_mask.to(device)
+                raise RuntimeError("runtime_seg.enabled must be true for evaluate_with_train_gallery.py")
 
             cam = batch.get("camera_id", ["unknown_camera"])[0]
             pid = batch.get("person_id", ["unknown_person"])[0]
             valid = person_mask > 0.5
             if valid.any():
-                score = torch.max(pred[valid]).item()
-                scores_by_camera[cam][pid].append(float(score))
+                score = (pred * valid.float()).sum() / torch.clamp(valid.float().sum(), min=1.0)
+                scores_by_camera[cam][pid].append(float(score.item()))
     return scores_by_camera
 
 
@@ -106,20 +115,20 @@ def main() -> None:
         tuple(cfg.data.image_size),
         normalize_rgb=cfg.data.normalize_rgb,
         use_pair_consistency=False,
-        max_matches=cfg.data.max_matches,
+        train_mode=False,
     )
     test_ds = HeightDataset(
         cfg.paths.test_manifest,
         tuple(cfg.data.image_size),
         normalize_rgb=cfg.data.normalize_rgb,
         use_pair_consistency=False,
-        max_matches=cfg.data.max_matches,
+        train_mode=False,
     )
     train_loader = DataLoader(train_ds, batch_size=1, shuffle=False, num_workers=cfg.train.num_workers)
     test_loader = DataLoader(test_ds, batch_size=1, shuffle=False, num_workers=cfg.train.num_workers)
 
     model = HeightNetTiny(base_channels=cfg.model.base_channels).to(device)
-    ckpt = torch.load(args.checkpoint, map_location=device)
+    ckpt = _torch_load_compat(args.checkpoint, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model"])
 
     segmenter = None

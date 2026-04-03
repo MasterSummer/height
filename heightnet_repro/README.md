@@ -1,19 +1,18 @@
 # HeightNet Reproduction Skeleton
 
-This folder provides a minimal, runnable baseline for reproducing the HeightNet workflow:
+This folder provides a runnable HeightNet-style baseline centered on video-level pairwise ranking:
 
-1. Generate height/valid_mask from depth + camera background depth.
-2. Build train/val/test manifests.
-3. Train/evaluate with runtime segmentation (person mask generated on the fly).
-4. Optimize not only dense height regression, but also person-level pairwise ranking.
+1. Build train/val/test manifests directly from raw videos with person-level split.
+2. Decode video frames online during training/evaluation.
+3. Predict dense height maps and generate runtime person masks on the fly.
+4. Optimize dense height regression as an auxiliary task and video-level pairwise ranking as the primary task.
 
 ## Project Structure
 
 - `configs/default.yaml`: default training config.
 - `src/heightnet/`: dataset, model, losses, metrics, utility code.
 - `tools/precompute_height_labels.py`: create `height/*.npy` and `valid_mask/*.npy`.
-- `tools/prepare_end2end_data.py`: one-command data prep for all splits.
-- `tools/build_manifest.py`: build csv manifests.
+- `tools/build_manifest.py`: scan raw videos and build train/val/test manifests with person-level split.
 - `tools/generate_pairwise_rank_from_2503.py`: generate pairwise labels from `2503_test_rank`.
 - `train.py`: training entrypoint.
 - `evaluate.py`: testing + visualization.
@@ -22,14 +21,11 @@ This folder provides a minimal, runnable baseline for reproducing the HeightNet 
 
 ```text
 data_root/
-  train/
-    rgb/<sequence_id>/<frame>.png
-    depth/<sequence_id>/<frame>.npy  # from Depth Anything V2
-    person_mask/<sequence_id>/<frame>.npy   # optional if runtime_seg.enabled=true
-  val/
-    ...
-  test/
-    ...
+  <person_id>/
+    *.mp4
+  height_cache/<person_id>__<video_stem>.npz  # optional
+  valid_mask_cache/<person_id>__<video_stem>.npz  # optional
+  depth_cache/<person_id>__<video_stem>.npz|npy  # optional
 ```
 
 Default label-generation behavior:
@@ -47,14 +43,12 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 1) End-to-end data prep (height + valid_mask + manifests)
-python tools/prepare_end2end_data.py \
-  --data-root /path/to/data_root \
+# 1) Build manifests directly from raw videos with person-level split
+python tools/build_manifest.py \
+  --video-root /path/to/video_root \
+  --out-dir /Users/yiding/code/gait/height/heightnet_repro/data \
   --bg-depth-root /path/to/2503_test_bg_depthmap \
-  --person-mask-source depth \
-  --camera-height-m 6.4 \
-  --out-dir data \
-  --matches-root data/matches
+  --allow-online-depth-supervision
 
 # 2) Train
 # set runtime_seg.model_path in configs/default.yaml first (e.g. yolov8n-seg.pt)
@@ -68,83 +62,34 @@ python evaluate.py --config configs/default.yaml --checkpoint runs/default/check
 python tools/generate_pairwise_rank_from_2503.py --rank-dir /Users/yiding/code/gait/2503_test_rank --out-dir data/pairwise_rank
 ```
 
-## One-Click Pipeline (videos -> depth -> height -> manifest)
-
-If you want a single command from raw videos to manifests, use:
+### 4-GPU Training (A100 x4, 最小可跑)
 
 ```bash
-python tools/prepare_videos_to_manifest.py \
+cd /Users/yiding/code/gait/height/heightnet_repro
+source .venv/bin/activate
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export OMP_NUM_THREADS=8
+
+# 1) 生成视频级 manifest（只需一次）
+python tools/build_manifest.py \
   --video-root /path/to/video_root \
-  --data-root /path/to/data_root \
+  --out-dir /Users/yiding/code/gait/height/heightnet_repro/data/run_4gpu \
   --bg-depth-root /path/to/bg_depth_root \
-  --camera-height-m 6.4 \
-  --depthanything-root /path/to/Depth-Anything-V2 \
-  --depth-encoder vitl \
-  --depth-checkpoint /path/to/depth_anything_v2_vitl.pth \
-  --person-mask-source seg \
-  --person-seg-model /path/to/yolov8n-seg.pt \
-  --out-dir /path/to/heightnet_repro/data \
-  --matches-root /path/to/heightnet_repro/data/matches
-```
+  --allow-online-depth-supervision
 
-This command orchestrates:
-1) `prepare_midrun_dataset.py` (video -> rgb)  
-2) Depth Anything V2 inference (rgb -> depth .npy)  
-3) `prepare_end2end_data.py` (depth -> height/valid_mask + manifests)
+# 2) 训练（配置见 HEIGHTNET_REPRO_IO_FLOW.md 第 8 节）
+torchrun --standalone --nproc_per_node=4 train.py --config configs/a100_4gpu_min.yaml
 
-## One-Click From Existing RGB (rgb -> depth -> labels -> manifests -> train)
-
-If you already have `data_root/{train,val,test}/rgb` and camera background depth maps:
-
-```bash
-python tools/from_rgb_one_click.py \
-  --data-root /path/to/heightnet_data_midrun \
-  --bg-depth-root /path/to/2503_test_bg_depthmap \
-  --camera-height-m 6.4 \
-  --depthanything-root /path/to/Depth-Anything-V2 \
-  --depth-encoder vitl \
-  --depth-checkpoint /path/to/depth_anything_v2_vitl.pth \
-  --person-mask-source depth \
-  --run-name auto_from_rgb
-```
-
-Notes:
-- `person-mask-source depth` only affects offline data prep.
-- Training/evaluation `person_mask` is generated online when `runtime_seg.enabled=true`.
-- Use `--prepare-only` if you want to stop before `train.py`.
-- Add `--launcher torchrun --nproc-per-node 4` for 4-GPU training.
-
-### 4-GPU Training (A100 x4)
-
-Directly train with DDP:
-
-```bash
-torchrun --standalone --nproc_per_node=4 train.py --config configs/auto_from_rgb.yaml
-```
-
-Or one-click from RGB:
-
-```bash
-python tools/from_rgb_one_click.py \
-  --data-root /path/to/heightnet_data_midrun \
-  --bg-depth-root /path/to/2503_test_bg_depthmap \
-  --camera-height-m 6.4 \
-  --depthanything-root /path/to/Depth-Anything-V2 \
-  --depth-encoder vitl \
-  --depth-checkpoint /path/to/depth_anything_v2_vitl.pth \
-  --person-mask-source depth \
-  --run-name auto_from_rgb_4gpu \
-  --launcher torchrun \
-  --nproc-per-node 4
+# 3) 评估
+python evaluate.py \
+  --config configs/a100_4gpu_min.yaml \
+  --checkpoint /Users/yiding/code/gait/height/heightnet_repro/runs/a100_4gpu_min/checkpoint_best.pt \
+  --rank-dir /Users/yiding/code/gait/2503_test_rank
 ```
 
 ## Notes
 
 - This is a pragmatic scaffold, not the exact original HeightNet implementation.
-- Paper details that are unclear are implemented with conservative defaults:
-  - `SiLog lambda = 0.85`
-  - `consistency_weight = 0.1`
-  - `pairwise_weight = 0.5`
-  - warmup 5 epochs before consistency loss
-  - person-mask max-score consistency across adjacent frames
+- Current default model selection is based on validation `pairwise accuracy`, not RMSE.
+- Runtime segmentation keeps only the largest detected person mask per frame.
 - To align closer to paper-reported numbers, you should replace `HeightNetTiny` with the LapDepth-style encoder-decoder and tune data generation details.

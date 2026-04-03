@@ -3,25 +3,48 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Dict
+from typing import Dict, List, Tuple
 
 import torch
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm
+
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except Exception:
+    SummaryWriter = None
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 from heightnet.config import load_config
 from heightnet.datasets import HeightDataset
-from heightnet.losses import HeightNetLoss
-from heightnet.metrics import rmse
+from heightnet.gallery import (
+    build_frame_feature_gallery,
+    build_video_feature_gallery,
+    cross_split_pairwise_metrics,
+    sample_frame_row_indices_per_person,
+    save_video_feature_gallery,
+)
+from heightnet.losses import HeightNetLoss, build_rank_pairs, masked_rmse
 from heightnet.model import HeightNetTiny
+from heightnet.runtime_depth import RuntimeDepthEstimator, depth_to_height
 from heightnet.runtime_seg import PersonSegmenter
 from heightnet.utils import ensure_dir, set_seed
+
+
+def _torch_load_compat(
+    path: str,
+    map_location: str | torch.device,
+    *,
+    weights_only: bool,
+):
+    try:
+        return torch.load(path, map_location=map_location, weights_only=weights_only)
+    except TypeError:
+        return torch.load(path, map_location=map_location)
 
 
 def _is_distributed() -> bool:
@@ -44,9 +67,6 @@ def _setup_distributed(cfg_device: str) -> tuple[bool, int, int, torch.device]:
 
     if not torch.cuda.is_available():
         raise RuntimeError("Distributed training requires CUDA devices.")
-    if not dist.is_available():
-        raise RuntimeError("torch.distributed is not available in this PyTorch build.")
-
     local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     torch.cuda.set_device(local_rank)
     dist.init_process_group(backend="nccl")
@@ -63,32 +83,93 @@ def _cleanup_distributed() -> None:
 
 def _require_file(path: str, name: str) -> None:
     if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"{name} not found: {path}. "
-            "Please generate manifests with tools/build_manifest.py or fix paths in config."
+        raise FileNotFoundError(f"{name} not found: {path}")
+
+
+def _has_dataset_source(manifest_path: str, video_root: str) -> bool:
+    return bool(manifest_path or video_root)
+
+
+def _build_dataset(
+    manifest_path: str,
+    video_root: str,
+    bg_depth_root: str,
+    image_size: tuple[int, int],
+    normalize_rgb: bool,
+    use_pair_consistency: bool,
+    train_mode: bool,
+) -> HeightDataset:
+    if manifest_path:
+        return HeightDataset(
+            manifest_path,
+            image_size,
+            normalize_rgb=normalize_rgb,
+            use_pair_consistency=use_pair_consistency,
+            train_mode=train_mode,
         )
+    return HeightDataset.from_video_root(
+        video_root=video_root,
+        bg_depth_root=bg_depth_root,
+        image_size=image_size,
+        normalize_rgb=normalize_rgb,
+        use_pair_consistency=use_pair_consistency,
+        train_mode=train_mode,
+    )
 
 
-def collate_fn(batch):
-    out: Dict[str, torch.Tensor | list[str]] = {}
-    for key in [
-        "image",
-        "image_raw",
-        "height",
-        "mask",
-        "person_mask",
-        "image_pair",
-        "image_pair_raw",
-        "person_mask_pair",
-    ]:
+def _gallery_path(output_dir: str, suffix: str) -> str:
+    return os.path.join(output_dir, f"train_gallery_{suffix}.pt")
+
+
+def collate_fn(batch: list[dict]) -> dict:
+    out: Dict[str, torch.Tensor | list[str] | list[int]] = {}
+    tensor_keys = ["image", "image_raw", "height", "mask", "image_pair", "image_pair_raw", "bg_depth", "camera_height_m", "need_online_depth"]
+    for key in tensor_keys:
         if key in batch[0]:
             out[key] = torch.stack([x[key] for x in batch], dim=0)
 
-    for key in ["person_id", "camera_id", "sequence_id"]:
+    list_keys = ["person_id", "camera_id", "sequence_id", "frame_idx", "frame_idx_pair"]
+    for key in list_keys:
         if key in batch[0]:
             out[key] = [x[key] for x in batch]
-
     return out
+
+
+def _resolve_online_supervision(
+    batch: dict,
+    target: torch.Tensor,
+    valid_mask: torch.Tensor,
+    runtime_depth: RuntimeDepthEstimator | None,
+    eps: float,
+    assume_inverse: bool,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if "need_online_depth" not in batch:
+        return target, valid_mask
+    need_cpu = (batch["need_online_depth"] > 0.5).view(-1).cpu()
+    if not torch.any(need_cpu):
+        return target, valid_mask
+    if runtime_depth is None:
+        raise RuntimeError("batch requires online depth supervision but runtime_depth is disabled.")
+
+    raw = batch["image_raw"][need_cpu].to(target.device)
+    bg = batch["bg_depth"][need_cpu].to(target.device)
+    cam_h = batch["camera_height_m"][need_cpu].to(target.device).view(-1, 1, 1, 1)
+
+    depth = runtime_depth.infer_batch(raw)
+    h, m = depth_to_height(
+        depth=depth,
+        bg_depth=bg,
+        camera_height_m=cam_h,
+        eps=eps,
+        assume_inverse=assume_inverse,
+    )
+
+    target = target.clone()
+    valid_mask = valid_mask.clone()
+    need = need_cpu.to(target.device)
+    target[need] = h
+    valid_mask[need] = m
+    return target, valid_mask
 
 
 def _denormalize_image_batch(image: torch.Tensor, normalize_rgb: bool) -> torch.Tensor:
@@ -105,18 +186,51 @@ def _norm_map(x: torch.Tensor) -> torch.Tensor:
     return torch.clamp((x - x_min) / (x_max - x_min + 1e-6), 0.0, 1.0)
 
 
+def _gather_list_distributed(values: list, device: torch.device, distributed: bool) -> list:
+    if not distributed:
+        return values
+    gathered = [None for _ in range(dist.get_world_size())]
+    dist.all_gather_object(gathered, values)
+    out = []
+    for item in gathered:
+        out.extend(item)
+    return out
+
+
 @torch.no_grad()
-def evaluate(model, loader, device, distributed: bool = False):
+def evaluate(
+    model,
+    loader,
+    query_ds: HeightDataset,
+    gallery_ds: HeightDataset,
+    device,
+    segmenter: PersonSegmenter,
+    runtime_depth: RuntimeDepthEstimator | None,
+    eps: float,
+    pairwise_labels: Dict[str, Dict[Tuple[str, str], int]],
+    min_valid_pixels: int,
+    min_valid_ratio: float,
+    frames_per_person_eval: int,
+    frame_eval_seed: int,
+    assume_inverse: bool,
+    distributed: bool = False,
+) -> dict:
     model.eval()
     meters = {"rmse": 0.0, "n": 0}
-
     for batch in loader:
         image = batch["image"].to(device)
         target = batch["height"].to(device)
         mask = batch["mask"].to(device)
-        pred = model(image)
-
-        meters["rmse"] += rmse(pred, target, mask).item()
+        target, mask = _resolve_online_supervision(
+            batch=batch,
+            target=target,
+            valid_mask=mask,
+            runtime_depth=runtime_depth,
+            eps=eps,
+            assume_inverse=assume_inverse,
+        )
+        pred = model(image)["pred_height_map"]
+        meters["rmse"] += masked_rmse(pred, target, mask).item()
         meters["n"] += 1
 
     if distributed:
@@ -128,6 +242,53 @@ def evaluate(model, loader, device, distributed: bool = False):
         meters["n"] = int(n_sum.item())
     else:
         meters["rmse"] /= max(meters["n"], 1)
+    if _is_main_process() or not distributed:
+        model_ref = model.module if distributed else model
+        query_indices = sample_frame_row_indices_per_person(query_ds, max_per_person=frames_per_person_eval, seed=frame_eval_seed)
+        gallery_indices = sample_frame_row_indices_per_person(gallery_ds, max_per_person=frames_per_person_eval, seed=frame_eval_seed)
+        query_records = build_frame_feature_gallery(
+            model=model_ref,
+            dataset=query_ds,
+            device=device,
+            segmenter=segmenter,
+            row_indices=query_indices,
+            min_valid_pixels=min_valid_pixels,
+            min_valid_ratio=min_valid_ratio,
+        )
+        gallery_records = build_frame_feature_gallery(
+            model=model_ref,
+            dataset=gallery_ds,
+            device=device,
+            segmenter=segmenter,
+            row_indices=gallery_indices,
+            min_valid_pixels=min_valid_pixels,
+            min_valid_ratio=min_valid_ratio,
+        )
+
+        def _prob_fn(i: int, j: int) -> float:
+            with torch.no_grad():
+                logit = model_ref.compare_encoded(
+                    query_records[i]["feature"].unsqueeze(0).to(device),
+                    gallery_records[j]["feature"].unsqueeze(0).to(device),
+                )
+            return float(torch.sigmoid(logit)[0].item())
+
+        pair_metrics = cross_split_pairwise_metrics(query_records, gallery_records, pairwise_labels, _prob_fn)
+    else:
+        pair_metrics = None
+    if distributed:
+        gathered = [None for _ in range(dist.get_world_size())]
+        dist.all_gather_object(gathered, pair_metrics)
+        pair_metrics = next((x for x in gathered if x is not None), None)
+        pair_metrics = pair_metrics or {
+            "pairwise_accuracy": 0.0,
+            "auc": 0.0,
+            "f1": 0.0,
+            "n_pairs_eval": 0,
+            "n_comparisons": 0,
+            "rankings": {},
+        }
+    meters.update(pair_metrics)
     return meters
 
 
@@ -141,31 +302,52 @@ def main() -> None:
     writer = None
     try:
         cfg = load_config(args.config)
-        if os.environ.get("HEIGHTNET_ANOMALY", "0") == "1":
-            torch.autograd.set_detect_anomaly(True)
         distributed, rank, world_size, device = _setup_distributed(cfg.device)
         set_seed(cfg.seed + rank)
-        _require_file(cfg.paths.train_manifest, "train_manifest")
-        _require_file(cfg.paths.val_manifest, "val_manifest")
-        if cfg.loss.pairwise_enabled:
-            _require_file(cfg.loss.pairwise_json, "pairwise_json")
+
+        if not _has_dataset_source(cfg.paths.train_manifest, cfg.paths.train_video_root):
+            raise RuntimeError("train dataset source missing: set either paths.train_manifest or paths.train_video_root")
+        if not _has_dataset_source(cfg.paths.val_manifest, cfg.paths.val_video_root):
+            raise RuntimeError("val dataset source missing: set either paths.val_manifest or paths.val_video_root")
+        if cfg.paths.train_manifest:
+            _require_file(cfg.paths.train_manifest, "train_manifest")
+        if cfg.paths.val_manifest:
+            _require_file(cfg.paths.val_manifest, "val_manifest")
+        _require_file(cfg.loss.pairwise_json, "pairwise_json")
+
+        if not cfg.runtime_seg.enabled:
+            raise RuntimeError("runtime_seg.enabled must be true. person_mask is only from runtime segmentation.")
+        _require_file(cfg.runtime_seg.model_path, "runtime segmentation model")
 
         if _is_main_process():
             ensure_dir(cfg.paths.output_dir)
 
-        train_ds = HeightDataset(
-            cfg.paths.train_manifest,
-            tuple(cfg.data.image_size),
+        train_ds = _build_dataset(
+            manifest_path=cfg.paths.train_manifest,
+            video_root=cfg.paths.train_video_root,
+            bg_depth_root=cfg.paths.bg_depth_root,
+            image_size=tuple(cfg.data.image_size),
             normalize_rgb=cfg.data.normalize_rgb,
             use_pair_consistency=cfg.data.use_pair_consistency,
-            max_matches=cfg.data.max_matches,
+            train_mode=True,
         )
-        val_ds = HeightDataset(
-            cfg.paths.val_manifest,
-            tuple(cfg.data.image_size),
+        gallery_ds = _build_dataset(
+            manifest_path=cfg.paths.train_manifest,
+            video_root=cfg.paths.train_video_root,
+            bg_depth_root=cfg.paths.bg_depth_root,
+            image_size=tuple(cfg.data.image_size),
             normalize_rgb=cfg.data.normalize_rgb,
             use_pair_consistency=False,
-            max_matches=cfg.data.max_matches,
+            train_mode=False,
+        )
+        val_ds = _build_dataset(
+            manifest_path=cfg.paths.val_manifest,
+            video_root=cfg.paths.val_video_root,
+            bg_depth_root=cfg.paths.bg_depth_root,
+            image_size=tuple(cfg.data.image_size),
+            normalize_rgb=cfg.data.normalize_rgb,
+            use_pair_consistency=cfg.data.use_pair_consistency,
+            train_mode=False,
         )
 
         train_sampler = DistributedSampler(train_ds, num_replicas=world_size, rank=rank, shuffle=True) if distributed else None
@@ -190,48 +372,62 @@ def main() -> None:
             collate_fn=collate_fn,
         )
 
-        model = HeightNetTiny(base_channels=cfg.model.base_channels).to(device)
+        model = HeightNetTiny(
+            base_channels=cfg.model.base_channels,
+            comparator_channels=cfg.model.comparator_channels,
+        ).to(device)
         if distributed:
-            model = DDP(model, device_ids=[device.index], output_device=device.index)
-        segmenter = None
-        if cfg.runtime_seg.enabled:
-            segmenter = PersonSegmenter(
-                model_path=cfg.runtime_seg.model_path,
-                conf=cfg.runtime_seg.conf,
-                iou=cfg.runtime_seg.iou,
-                imgsz=cfg.runtime_seg.imgsz,
-                strict_native=cfg.runtime_seg.strict_native,
+            model = DDP(
+                model,
+                device_ids=[device.index],
+                output_device=device.index,
+                find_unused_parameters=True,
             )
-        criterion = HeightNetLoss(
-            silog_lambda=cfg.loss.silog_lambda,
-            consistency_weight=cfg.loss.consistency_weight,
-            pairwise_weight=cfg.loss.pairwise_weight,
-            pairwise_json=cfg.loss.pairwise_json,
+
+        segmenter = PersonSegmenter(
+            model_path=cfg.runtime_seg.model_path,
+            conf=cfg.runtime_seg.conf,
+            iou=cfg.runtime_seg.iou,
+            imgsz=cfg.runtime_seg.imgsz,
+            strict_native=cfg.runtime_seg.strict_native,
         )
+        runtime_depth = None
+        if cfg.runtime_depth.enabled:
+            runtime_depth = RuntimeDepthEstimator(
+                depthanything_root=cfg.runtime_depth.depthanything_root,
+                encoder=cfg.runtime_depth.encoder,
+                checkpoint=cfg.runtime_depth.checkpoint,
+                input_size=cfg.runtime_depth.input_size,
+            ).to(device)
+
+        criterion = HeightNetLoss(
+            lambda_rmse=cfg.loss.lambda_rmse,
+            lambda_rank=cfg.loss.lambda_rank,
+            lambda_cons=cfg.loss.lambda_cons,
+            eps=cfg.loss.eps,
+            min_valid_pixels=cfg.loss.min_valid_pixels,
+            min_valid_ratio=cfg.loss.min_valid_ratio,
+        )
+        pairwise_labels = HeightNetLoss.load_pairwise_labels(cfg.loss.pairwise_json)
+
         optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.weight_decay)
-        scaler = torch.cuda.amp.GradScaler(enabled=cfg.train.use_amp and device.type == "cuda")
-        if cfg.train.use_tensorboard and _is_main_process():
+        scaler = torch.amp.GradScaler("cuda", enabled=cfg.train.use_amp and device.type == "cuda")
+
+        if cfg.train.use_tensorboard and _is_main_process() and SummaryWriter is not None:
             tb_dir = os.path.join(cfg.paths.output_dir, "tb")
             ensure_dir(tb_dir)
             writer = SummaryWriter(log_dir=tb_dir)
+        elif cfg.train.use_tensorboard and _is_main_process() and SummaryWriter is None:
+            print("[warn] tensorboard is unavailable in current environment; continue without it.")
 
-        if _is_main_process():
-            mode = "ddp" if distributed else "single"
-            print(
-                f"[train] mode={mode}, world_size={world_size}, "
-                f"batch_per_gpu={cfg.train.batch_size}, effective_batch={cfg.train.batch_size * world_size}"
-            )
-
-        best_rmse = float("inf")
+        best_pairwise_accuracy = float("-inf")
         global_step = 0
         start_epoch = 0
 
         if args.resume:
             _require_file(args.resume, "resume checkpoint")
-            ckpt = torch.load(args.resume, map_location=device)
+            ckpt = _torch_load_compat(args.resume, map_location=device, weights_only=False)
             model_state = ckpt.get("model")
-            if model_state is None:
-                raise RuntimeError(f"Invalid checkpoint (missing 'model'): {args.resume}")
             if distributed:
                 model.module.load_state_dict(model_state)
             else:
@@ -242,12 +438,7 @@ def main() -> None:
                 scaler.load_state_dict(ckpt["scaler"])
             start_epoch = int(ckpt.get("epoch", 0))
             global_step = int(ckpt.get("global_step", 0))
-            best_rmse = float(ckpt.get("best_rmse", float("inf")))
-            if _is_main_process():
-                print(
-                    f"[resume] loaded={args.resume}, start_epoch={start_epoch + 1}, "
-                    f"global_step={global_step}, best_rmse={best_rmse:.4f}"
-                )
+            best_pairwise_accuracy = float(ckpt.get("best_pairwise_accuracy", float("-inf")))
 
         for epoch in range(start_epoch, cfg.train.epochs):
             if train_sampler is not None:
@@ -256,14 +447,8 @@ def main() -> None:
                 val_sampler.set_epoch(epoch)
 
             model.train()
-            running = {"total": 0.0, "silog": 0.0, "consistency": 0.0, "pairwise": 0.0, "n": 0}
-            pbar = tqdm(
-                train_loader,
-                desc=f"Epoch {epoch + 1}/{cfg.train.epochs}",
-                disable=not _is_main_process(),
-            )
-            enable_cons = cfg.data.use_pair_consistency and epoch >= cfg.loss.consistency_warmup_epochs
-            enable_pairwise = cfg.loss.pairwise_enabled and epoch >= cfg.loss.pairwise_warmup_epochs
+            running = {"total": 0.0, "rmse": 0.0, "rank": 0.0, "consistency": 0.0, "n": 0}
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{cfg.train.epochs}", disable=not _is_main_process())
             vis_logged = False
 
             for batch in pbar:
@@ -272,45 +457,50 @@ def main() -> None:
                 mask = batch["mask"].to(device)
 
                 optimizer.zero_grad(set_to_none=True)
-                with torch.cuda.amp.autocast(enabled=cfg.train.use_amp and device.type == "cuda"):
-                    pred = model(image)
-                    pred_pair = None
-                    if segmenter is not None:
-                        if "image_raw" not in batch:
-                            raise RuntimeError("image_raw is required for runtime segmentation.")
-                        person_mask = segmenter.infer_batch(batch["image_raw"], device)
-                        person_mask_pair = None
-                        if enable_cons:
-                            if "image_pair_raw" not in batch:
-                                raise RuntimeError("image_pair_raw is required when pair consistency is enabled.")
-                            person_mask_pair = segmenter.infer_batch(batch["image_pair_raw"], device)
-                    else:
-                        person_mask = batch.get("person_mask")
-                        person_mask_pair = batch.get("person_mask_pair")
-                        if person_mask is not None:
-                            person_mask = person_mask.to(device)
-                        if person_mask_pair is not None:
-                            person_mask_pair = person_mask_pair.to(device)
-                        if person_mask is None:
-                            raise RuntimeError("person_mask is required for training when runtime_seg is disabled.")
+                with torch.amp.autocast("cuda", enabled=cfg.train.use_amp and device.type == "cuda"):
+                    if "image_pair_raw" not in batch:
+                        raise RuntimeError("image_pair_raw is required for consistency branch.")
+                    image_pair = batch["image_pair"].to(device)
+                    person_mask = segmenter.infer_batch(batch["image_raw"], device)
+                    person_mask_pair = segmenter.infer_batch(batch["image_pair_raw"], device)
+                    target, mask = _resolve_online_supervision(
+                        batch=batch,
+                        target=target,
+                        valid_mask=mask,
+                        runtime_depth=runtime_depth,
+                        eps=cfg.loss.eps,
+                        assume_inverse=cfg.runtime_depth.assume_inverse,
+                    )
 
-                    if enable_cons and "image_pair" in batch:
-                        if person_mask_pair is None:
-                            raise RuntimeError("person_mask_pair is required when pair consistency is enabled.")
-                        image_pair = batch["image_pair"].to(device)
-                        pred_pair = model(image_pair)
+                    idx_i, idx_j, pair_label = build_rank_pairs(
+                        person_ids=batch["person_id"],
+                        camera_ids=batch["camera_id"],
+                        person_masks=person_mask,
+                        pairwise_labels=pairwise_labels,
+                        min_valid_pixels=cfg.loss.min_valid_pixels,
+                        min_valid_ratio=cfg.loss.min_valid_ratio,
+                        device=device,
+                    )
+
+                    batch_size = image.shape[0]
+                    forward_out = model(
+                        torch.cat([image, image_pair], dim=0),
+                        pair_inputs=(idx_i, idx_j, person_mask) if pair_label.numel() > 0 else None,
+                    )
+                    pred_all = forward_out["pred_height_map"]
+                    pred = pred_all[:batch_size]
+                    pred_pair = pred_all[batch_size:]
+                    pair_logit = forward_out["pair_logit"]
 
                     losses = criterion(
-                        pred=pred,
-                        target=target,
-                        mask=mask,
+                        pred_height=pred,
+                        target_height=target,
+                        valid_mask=mask,
                         pred_pair=pred_pair,
                         person_mask=person_mask,
                         person_mask_pair=person_mask_pair,
-                        person_ids=batch.get("person_id"),
-                        camera_ids=batch.get("camera_id"),
-                        enable_pairwise=enable_pairwise,
-                        enable_consistency=enable_cons,
+                        pair_logit=pair_logit,
+                        pair_label=pair_label,
                     )
 
                 scaler.scale(losses["total"]).backward()
@@ -320,27 +510,31 @@ def main() -> None:
                 scaler.update()
 
                 running["total"] += losses["total"].item()
-                running["silog"] += losses["silog"].item()
+                running["rmse"] += losses["rmse"].item()
+                running["rank"] += losses["rank"].item()
                 running["consistency"] += losses["consistency"].item()
-                running["pairwise"] += losses["pairwise"].item()
                 running["n"] += 1
                 global_step += 1
+
                 if _is_main_process():
                     pbar.set_postfix(
                         total=running["total"] / running["n"],
-                        silog=running["silog"] / running["n"],
+                        rmse=running["rmse"] / running["n"],
+                        rank=running["rank"] / running["n"],
                         cons=running["consistency"] / running["n"],
-                        rank=running["pairwise"] / running["n"],
+                        rank_pairs=losses["rank_pairs"],
+                        cons_valid_pairs=losses["cons_valid_pairs"],
                     )
 
                 if writer is not None and global_step % max(cfg.train.log_interval, 1) == 0:
                     writer.add_scalar("train/loss_total", losses["total"].item(), global_step)
-                    writer.add_scalar("train/loss_silog", losses["silog"].item(), global_step)
+                    writer.add_scalar("train/loss_rmse", losses["rmse"].item(), global_step)
+                    writer.add_scalar("train/loss_rank", losses["rank"].item(), global_step)
                     writer.add_scalar("train/loss_consistency", losses["consistency"].item(), global_step)
-                    writer.add_scalar("train/loss_pairwise", losses["pairwise"].item(), global_step)
-                    writer.add_scalar("train/lr", optimizer.param_groups[0]["lr"], global_step)
+                    writer.add_scalar("train/rank_pairs", losses["rank_pairs"], global_step)
+                    writer.add_scalar("train/cons_valid_pairs", losses["cons_valid_pairs"], global_step)
 
-                if writer is not None and (not vis_logged):
+                if writer is not None and not vis_logged:
                     n_vis = min(cfg.train.tb_num_images, image.shape[0])
                     rgb = _denormalize_image_batch(image[:n_vis], cfg.data.normalize_rgb).detach().cpu()
                     gt = _norm_map(target[:n_vis]).repeat(1, 3, 1, 1).detach().cpu()
@@ -350,15 +544,38 @@ def main() -> None:
                     writer.add_images("train_vis/pred_height", pd, epoch + 1)
                     vis_logged = True
 
-            metrics = evaluate(model, val_loader, device, distributed=distributed)
+            metrics = evaluate(
+                model,
+                val_loader,
+                query_ds=val_ds,
+                gallery_ds=gallery_ds,
+                device=device,
+                segmenter=segmenter,
+                runtime_depth=runtime_depth,
+                eps=cfg.loss.eps,
+                pairwise_labels=pairwise_labels,
+                min_valid_pixels=cfg.loss.min_valid_pixels,
+                min_valid_ratio=cfg.loss.min_valid_ratio,
+                frames_per_person_eval=cfg.eval.frames_per_person_eval,
+                frame_eval_seed=cfg.eval.frame_eval_seed,
+                assume_inverse=cfg.runtime_depth.assume_inverse,
+                distributed=distributed,
+            )
             if _is_main_process():
-                print(f"[VAL] epoch={epoch + 1} rmse={metrics['rmse']:.4f}")
+                print(
+                    f"[VAL] epoch={epoch + 1} "
+                    f"pairwise_acc={metrics['pairwise_accuracy']:.4f} "
+                    f"auc={metrics['auc']:.4f} f1={metrics['f1']:.4f} "
+                    f"rmse={metrics['rmse']:.4f} n_pairs={metrics['n_pairs_eval']} "
+                    f"n_cmp={metrics['n_comparisons']}"
+                )
+
             if writer is not None:
                 writer.add_scalar("val/rmse", metrics["rmse"], epoch + 1)
-                writer.add_scalar("epoch/loss_total", running["total"] / max(running["n"], 1), epoch + 1)
-                writer.add_scalar("epoch/loss_silog", running["silog"] / max(running["n"], 1), epoch + 1)
-                writer.add_scalar("epoch/loss_consistency", running["consistency"] / max(running["n"], 1), epoch + 1)
-                writer.add_scalar("epoch/loss_pairwise", running["pairwise"] / max(running["n"], 1), epoch + 1)
+                writer.add_scalar("val/pairwise_accuracy", metrics["pairwise_accuracy"], epoch + 1)
+                writer.add_scalar("val/auc", metrics["auc"], epoch + 1)
+                writer.add_scalar("val/f1", metrics["f1"], epoch + 1)
+                writer.add_scalar("val/n_comparisons", metrics["n_comparisons"], epoch + 1)
 
             if _is_main_process():
                 ckpt_last = os.path.join(cfg.paths.output_dir, "checkpoint_last.pt")
@@ -370,14 +587,13 @@ def main() -> None:
                         "scaler": scaler.state_dict(),
                         "epoch": epoch + 1,
                         "global_step": global_step,
-                        "best_rmse": best_rmse,
-                        "cfg": cfg,
+                        "best_pairwise_accuracy": best_pairwise_accuracy,
                     },
                     ckpt_last,
                 )
 
-                if metrics["rmse"] < best_rmse:
-                    best_rmse = metrics["rmse"]
+                if metrics["pairwise_accuracy"] > best_pairwise_accuracy:
+                    best_pairwise_accuracy = metrics["pairwise_accuracy"]
                     ckpt_best = os.path.join(cfg.paths.output_dir, "checkpoint_best.pt")
                     torch.save(
                         {
@@ -386,11 +602,25 @@ def main() -> None:
                             "scaler": scaler.state_dict(),
                             "epoch": epoch + 1,
                             "global_step": global_step,
-                            "best_rmse": best_rmse,
-                            "cfg": cfg,
+                            "best_pairwise_accuracy": best_pairwise_accuracy,
                         },
                         ckpt_best,
                     )
+                    if cfg.eval.save_train_gallery:
+                        gallery_records = build_video_feature_gallery(
+                            model=model,
+                            dataset=gallery_ds,
+                            device=device,
+                            segmenter=segmenter,
+                            num_frames=cfg.eval.video_feature_frames,
+                            min_valid_pixels=cfg.loss.min_valid_pixels,
+                            min_valid_ratio=cfg.loss.min_valid_ratio,
+                        )
+                        save_video_feature_gallery(
+                            _gallery_path(cfg.paths.output_dir, "best"),
+                            gallery_records,
+                            num_frames=cfg.eval.video_feature_frames,
+                        )
 
     finally:
         if writer is not None:
