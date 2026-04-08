@@ -51,16 +51,38 @@ def main() -> None:
 
             pts0 = np.float32([kp0[m.queryIdx].pt for m in raw])
             pts1 = np.float32([kp1[m.trainIdx].pt for m in raw])
+            if pts0.ndim != 2 or pts1.ndim != 2 or pts0.shape[1] != 2 or pts1.shape[1] != 2:
+                continue
+            if len(pts0) < 8 or len(pts1) < 8:
+                continue
+
+            finite = (
+                np.isfinite(pts0).all(axis=1)
+                & np.isfinite(pts1).all(axis=1)
+            )
+            pts0 = pts0[finite]
+            pts1 = pts1[finite]
+            if len(pts0) < 8:
+                continue
 
             # Geometric filtering for robust consistency supervision.
-            _, inlier = cv2.findFundamentalMat(pts0, pts1, cv2.FM_RANSAC, 1.5, 0.99)
-            if inlier is None:
-                continue
-            inlier = inlier.ravel().astype(bool)
-            pts0 = pts0[inlier]
-            pts1 = pts1[inlier]
+            try:
+                _, inlier = cv2.findFundamentalMat(pts0, pts1, cv2.FM_RANSAC, 1.5, 0.99)
+            except cv2.error:
+                inlier = None
+
+            if inlier is not None:
+                inlier = inlier.ravel().astype(bool)
+                if inlier.shape[0] == pts0.shape[0]:
+                    pts0 = pts0[inlier]
+                    pts1 = pts1[inlier]
+
+            # Fallback: if geometric filter fails or becomes empty, keep best raw matches.
             if len(pts0) == 0:
                 continue
+            if len(pts0) > args.max_points:
+                pts0 = pts0[: args.max_points]
+                pts1 = pts1[: args.max_points]
 
             stem0 = os.path.splitext(os.path.basename(p0))[0]
             stem1 = os.path.splitext(os.path.basename(p1))[0]

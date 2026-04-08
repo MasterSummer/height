@@ -2,38 +2,40 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import os
+import re
 
 import cv2
 import numpy as np
 
 
-def _estimate_bg_depth_from_seg(depth: np.ndarray, seg: np.ndarray, ground_class_id: int) -> np.ndarray:
-    h, w = depth.shape
-    ground_mask = (seg == ground_class_id).astype(np.uint8)
-    ground_depth = np.where(ground_mask > 0, depth, np.nan)
-    col_bg = np.nanmedian(ground_depth, axis=0)
-    global_bg = np.nanmedian(ground_depth)
-    col_bg = np.where(np.isnan(col_bg), global_bg, col_bg)
-    return np.tile(col_bg[None, :], (h, 1)).astype(np.float32)
+def _infer_camera_id(sequence_id: str) -> str | None:
+    m = re.search(r"\d+cm_(?:inside|outside|slantside|side|front|back)", sequence_id, re.IGNORECASE)
+    if m:
+        return m.group(0).lower()
+    return None
 
 
-def _estimate_bg_depth_without_seg(depth: np.ndarray, bottom_band_ratio: float) -> np.ndarray:
-    h, w = depth.shape
-    band_h = max(1, int(h * bottom_band_ratio))
-    bottom = depth[h - band_h :, :]
-    col_bg = np.nanmedian(bottom, axis=0)
-    global_bg = np.nanmedian(bottom)
-    col_bg = np.where(np.isnan(col_bg), global_bg, col_bg)
-    return np.tile(col_bg[None, :], (h, 1)).astype(np.float32)
+def _infer_camera_height_m_from_sequence(sequence_id: str) -> float | None:
+    m = re.search(r"(\d+)cm_(?:inside|outside|slantside|side|front|back)", sequence_id, re.IGNORECASE)
+    if not m:
+        return None
+    return float(m.group(1)) / 100.0
+
+
+def _load_bg_depth_map(bg_depth_root: str, camera_id: str, target_hw: tuple[int, int]) -> np.ndarray:
+    path = os.path.join(bg_depth_root, camera_id, f"{camera_id}_avg_depth.npy")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"background depth map not found: {path}")
+    arr = np.load(path).astype(np.float32)
+    h, w = target_hw
+    if arr.shape != (h, w):
+        arr = cv2.resize(arr, (w, h), interpolation=cv2.INTER_LINEAR).astype(np.float32)
+    return arr
 
 
 def compute_height_map(depth: np.ndarray, d_bg: np.ndarray, camera_height_m: float) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Corrected geometric target:
-      h = C_h * (D_b - D_f) / D_b
-    D_f is foreground/pixel depth, D_b is local background depth.
-    """
     d_f = depth.astype(np.float32)
     d_b = d_bg.astype(np.float32)
     valid = np.isfinite(d_f) & np.isfinite(d_b) & (np.abs(d_b) > 1e-6)
@@ -43,44 +45,176 @@ def compute_height_map(depth: np.ndarray, d_bg: np.ndarray, camera_height_m: flo
     return height, valid.astype(np.float32)
 
 
+def compute_person_mask(
+    depth: np.ndarray,
+    d_bg: np.ndarray,
+    valid: np.ndarray,
+    fg_rel_thresh: float = 0.06,
+    min_area: int = 128,
+) -> np.ndarray:
+    """
+    Build person mask automatically from depth difference to camera background depth.
+    Foreground condition: (D_b - D_f) / D_b > fg_rel_thresh.
+    """
+    d_f = depth.astype(np.float32)
+    d_b = d_bg.astype(np.float32)
+    rel = np.zeros_like(d_f, dtype=np.float32)
+    ok = valid > 0.5
+    rel[ok] = (d_b[ok] - d_f[ok]) / np.maximum(d_b[ok], 1e-6)
+    fg = (rel > fg_rel_thresh).astype(np.uint8)
+
+    # Morphology to remove noise and fill small holes.
+    k = np.ones((3, 3), dtype=np.uint8)
+    fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, k, iterations=1)
+    fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, k, iterations=2)
+
+    # Remove tiny connected components.
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg, connectivity=8)
+    out = np.zeros_like(fg, dtype=np.uint8)
+    for lab in range(1, num_labels):
+        area = stats[lab, cv2.CC_STAT_AREA]
+        if area >= min_area:
+            out[labels == lab] = 1
+    return out.astype(np.float32)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=str, required=True)
     parser.add_argument("--split", type=str, default="train", choices=["train", "val", "test"])
-    parser.add_argument("--camera-height-m", type=float, required=True)
-    parser.add_argument("--ground-class-id", type=int, default=0)
-    parser.add_argument("--bottom-band-ratio", type=float, default=0.15)
+    parser.add_argument(
+        "--camera-height-m",
+        type=float,
+        default=-1.0,
+        help="Fixed camera height in meters. Required when --camera-height-mode=fixed.",
+    )
+    parser.add_argument(
+        "--camera-height-mode",
+        type=str,
+        default="fixed",
+        choices=["fixed", "from-sequence-cm"],
+        help="Use fixed camera height or infer from sequence name, e.g. 350cm_* -> 3.5m.",
+    )
+    parser.add_argument(
+        "--bg-depth-root",
+        type=str,
+        required=True,
+        help="Root of camera-wise background depth maps, e.g. <root>/300cm_inside/300cm_inside_avg_depth.npy",
+    )
+    parser.add_argument("--fg-rel-thresh", type=float, default=0.06)
+    parser.add_argument("--min-area", type=int, default=128)
+    parser.add_argument(
+        "--skip-person-mask",
+        action="store_true",
+        help="Only generate height/valid_mask. person_mask will be generated by another stage.",
+    )
+    parser.add_argument(
+        "--overwrite-existing",
+        action="store_true",
+        help="Overwrite existing outputs. By default, existing targets are skipped.",
+    )
+    parser.add_argument(
+        "--allow-empty-split",
+        action="store_true",
+        help="Skip split when no depth files are found instead of raising error.",
+    )
+    parser.add_argument("--num-shards", type=int, default=1, help="Total parallel shards.")
+    parser.add_argument("--shard-id", type=int, default=0, help="Current shard id in [0, num_shards).")
     args = parser.parse_args()
+    if args.num_shards <= 0:
+        raise ValueError("--num-shards must be > 0")
+    if args.shard_id < 0 or args.shard_id >= args.num_shards:
+        raise ValueError("--shard-id must be in [0, num_shards)")
 
     split_root = os.path.join(args.data_root, args.split)
     depth_files = sorted(glob.glob(os.path.join(split_root, "depth", "*", "*.npy")))
+    if not depth_files:
+        msg = f"no depth files found under: {os.path.join(split_root, 'depth')}"
+        if args.allow_empty_split:
+            print(f"[skip] {msg}")
+            return
+        raise RuntimeError(msg)
 
+    count = 0
+    skipped = 0
+    shard_skipped = 0
     for depth_path in depth_files:
         rel = os.path.relpath(depth_path, os.path.join(split_root, "depth"))
         sequence_id = rel.split(os.sep)[0]
+        if args.num_shards > 1:
+            h = int(hashlib.md5(sequence_id.encode("utf-8")).hexdigest(), 16)
+            if (h % args.num_shards) != args.shard_id:
+                shard_skipped += 1
+                continue
         stem = os.path.splitext(os.path.basename(depth_path))[0]
         depth = np.load(depth_path).astype(np.float32)
-        seg_path = os.path.join(split_root, "seg", sequence_id, f"{stem}.png")
 
-        if os.path.exists(seg_path):
-            seg = cv2.imread(seg_path, cv2.IMREAD_GRAYSCALE)
-            if seg is not None:
-                d_bg = _estimate_bg_depth_from_seg(depth, seg, args.ground_class_id)
-            else:
-                d_bg = _estimate_bg_depth_without_seg(depth, args.bottom_band_ratio)
+        camera_id = _infer_camera_id(sequence_id)
+        if not camera_id:
+            raise ValueError(f"cannot infer camera_id from sequence_id: {sequence_id}")
+        if args.camera_height_mode == "fixed":
+            if args.camera_height_m <= 0:
+                raise ValueError("--camera-height-m must be > 0 when --camera-height-mode=fixed")
+            camera_height_m = args.camera_height_m
         else:
-            d_bg = _estimate_bg_depth_without_seg(depth, args.bottom_band_ratio)
-
-        height, valid = compute_height_map(depth, d_bg, args.camera_height_m)
+            camera_height_m = _infer_camera_height_m_from_sequence(sequence_id)
+            if camera_height_m is None:
+                raise ValueError(f"cannot infer camera height from sequence_id: {sequence_id}")
+        d_bg = _load_bg_depth_map(
+            bg_depth_root=args.bg_depth_root,
+            camera_id=camera_id,
+            target_hw=(depth.shape[0], depth.shape[1]),
+        )
 
         out_h = os.path.join(split_root, "height", sequence_id)
-        out_m = os.path.join(split_root, "valid_mask", sequence_id)
+        out_vm = os.path.join(split_root, "valid_mask", sequence_id)
+        out_pm = os.path.join(split_root, "person_mask", sequence_id)
         os.makedirs(out_h, exist_ok=True)
-        os.makedirs(out_m, exist_ok=True)
-        np.save(os.path.join(out_h, f"{stem}.npy"), height)
-        np.save(os.path.join(out_m, f"{stem}.npy"), valid)
+        os.makedirs(out_vm, exist_ok=True)
+        out_h_path = os.path.join(out_h, f"{stem}.npy")
+        out_vm_path = os.path.join(out_vm, f"{stem}.npy")
+        out_pm_path = os.path.join(out_pm, f"{stem}.npy")
 
-    print("Height labels generated.")
+        if args.skip_person_mask:
+            already_done = os.path.exists(out_h_path) and os.path.exists(out_vm_path)
+        else:
+            already_done = (
+                os.path.exists(out_h_path)
+                and os.path.exists(out_vm_path)
+                and os.path.exists(out_pm_path)
+            )
+        if already_done and not args.overwrite_existing:
+            skipped += 1
+            continue
+
+        height, valid = compute_height_map(depth, d_bg, camera_height_m)
+        person_mask = None
+        if not args.skip_person_mask:
+            person_mask = compute_person_mask(
+                depth=depth,
+                d_bg=d_bg,
+                valid=valid,
+                fg_rel_thresh=args.fg_rel_thresh,
+                min_area=args.min_area,
+            )
+            os.makedirs(out_pm, exist_ok=True)
+
+        np.save(out_h_path, height)
+        np.save(out_vm_path, valid)
+        if person_mask is not None:
+            np.save(out_pm_path, person_mask)
+        count += 1
+
+    if args.skip_person_mask:
+        print(
+            f"Generated height/valid_mask for {count} frames. "
+            f"skipped_existing={skipped}, skipped_by_shard={shard_skipped}"
+        )
+    else:
+        print(
+            f"Generated height/valid_mask/person_mask for {count} frames. "
+            f"skipped_existing={skipped}, skipped_by_shard={shard_skipped}"
+        )
 
 
 if __name__ == "__main__":
