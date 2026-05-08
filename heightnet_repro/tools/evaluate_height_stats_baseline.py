@@ -66,6 +66,8 @@ def main() -> None:
         comparator_layers=cfg.model.comparator_layers,
         comparator_num_heads=cfg.model.comparator_num_heads,
         comparator_patch_size=cfg.model.comparator_patch_size,
+        person_region_mode=cfg.model.person_region_mode,
+        bbox_expand_ratio=cfg.model.bbox_expand_ratio,
     ).to(device)
     ckpt = _torch_load_compat(args.checkpoint, map_location=device)
     model.load_state_dict(ckpt["model"])

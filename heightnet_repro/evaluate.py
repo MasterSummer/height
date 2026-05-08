@@ -207,6 +207,8 @@ def main() -> None:
         comparator_layers=cfg.model.comparator_layers,
         comparator_num_heads=cfg.model.comparator_num_heads,
         comparator_patch_size=cfg.model.comparator_patch_size,
+        person_region_mode=cfg.model.person_region_mode,
+        bbox_expand_ratio=cfg.model.bbox_expand_ratio,
     ).to(device)
     ckpt = _torch_load_compat(args.checkpoint, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model"])
@@ -284,7 +286,7 @@ def main() -> None:
                 eps=cfg.loss.eps,
                 assume_inverse=cfg.runtime_depth.assume_inverse,
             )
-            person_mask = segmenter.infer_batch(batch["image_raw"], device)
+            person_mask, person_bbox = segmenter.infer_batch_regions(batch["image_raw"], device)
 
             pred = model(image)["pred_height_map"]
             meters["rmse"] += masked_rmse(pred, target, valid_mask).item()
@@ -295,7 +297,7 @@ def main() -> None:
             pid = batch["person_id"][0]
 
             if not frame_level_eval:
-                feat = model.encode_person(pred[0:1], person_mask[0:1])[0].detach().cpu()
+                feat = model.encode_person(pred[0:1], person_mask[0:1], person_bbox[0:1])[0].detach().cpu()
                 test_gallery.append(
                     {
                         "sequence_id": seq,

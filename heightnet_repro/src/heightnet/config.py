@@ -43,6 +43,8 @@ class LossConfig:
     min_valid_ratio: float
     pairwise_json: str
     consistency_mode: str = "map"
+    listwise_lambda: float = 0.0
+    height_labels_json: str = ""
 
 
 @dataclass
@@ -61,6 +63,14 @@ class ModelConfig:
     comparator_layers: int = 2
     comparator_num_heads: int = 4
     comparator_patch_size: int = 16
+    person_region_mode: str = "mask"
+    bbox_expand_ratio: float = 0.25
+    histogram_min: float = 0.0
+    histogram_max: float = 3.0
+    compare_type: str = "concat"
+    use_geometry_branch: bool = False
+    geo_feat_dim: int = 5
+    geo_hidden_dim: int = 32
 
 
 @dataclass
@@ -71,6 +81,8 @@ class EvalConfig:
     save_train_gallery: bool = True
     frames_per_person_eval: int = 10
     frame_eval_seed: int = 42
+    eval_batch_size: int = 16
+    validate_every_epochs: int = 1
 
 
 @dataclass
@@ -91,6 +103,7 @@ class RuntimeDepthConfig:
     checkpoint: str
     input_size: int
     assume_inverse: bool = False
+    use_ground_anchor: bool = True
 
 
 @dataclass
@@ -135,6 +148,10 @@ def load_config(path: str) -> Config:
     if loss_raw.get("pairwise_json"):
         loss_raw["pairwise_json"] = _to_abs(workspace, loss_raw["pairwise_json"])
     loss_raw.setdefault("consistency_mode", "map")
+    if loss_raw.get("height_labels_json"):
+        loss_raw["height_labels_json"] = _to_abs(workspace, loss_raw["height_labels_json"])
+    loss_raw.setdefault("listwise_lambda", 0.0)
+    loss_raw.setdefault("height_labels_json", "")
 
     runtime_seg_raw = raw.get(
         "runtime_seg",
@@ -163,12 +180,15 @@ def load_config(path: str) -> Config:
     if runtime_depth_raw.get("checkpoint"):
         runtime_depth_raw["checkpoint"] = _to_abs(workspace, runtime_depth_raw["checkpoint"])
     runtime_depth_raw.setdefault("assume_inverse", False)
+    runtime_depth_raw.setdefault("use_ground_anchor", True)
 
     eval_raw = dict(raw["eval"])
     eval_raw.setdefault("video_feature_frames", 8)
     eval_raw.setdefault("save_train_gallery", True)
     eval_raw.setdefault("frames_per_person_eval", 10)
     eval_raw.setdefault("frame_eval_seed", 42)
+    eval_raw.setdefault("eval_batch_size", 16)
+    eval_raw.setdefault("validate_every_epochs", 1)
 
     model_raw = dict(raw["model"])
     model_raw.setdefault("comparator_channels", 16)
@@ -176,6 +196,14 @@ def load_config(path: str) -> Config:
     model_raw.setdefault("comparator_layers", 2)
     model_raw.setdefault("comparator_num_heads", 4)
     model_raw.setdefault("comparator_patch_size", 16)
+    model_raw.setdefault("person_region_mode", "mask")
+    model_raw.setdefault("bbox_expand_ratio", 0.25)
+    model_raw.setdefault("histogram_min", 0.0)
+    model_raw.setdefault("histogram_max", 3.0)
+    model_raw.setdefault("compare_type", "concat")
+    model_raw.setdefault("use_geometry_branch", False)
+    model_raw.setdefault("geo_feat_dim", 5)
+    model_raw.setdefault("geo_hidden_dim", 32)
 
     return Config(
         seed=raw["seed"],

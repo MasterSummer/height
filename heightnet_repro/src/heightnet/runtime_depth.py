@@ -91,13 +91,34 @@ def depth_to_height(
     camera_height_m: torch.Tensor,
     eps: float = 1e-6,
     assume_inverse: bool = False,
+    ground_mask: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     depth/bg_depth: [B,1,H,W], camera_height_m: [B,1,1,1]
+    ground_mask: optional [B,1,H,W] bool tensor indicating ground pixels for scale alignment.
+      When provided, the foreground depth is scaled so that its ground-region median
+      matches the background depth ground-region median, correcting for DA2 scale drift.
     returns (height, valid_mask)
     """
     depth_work = depth
     bg_work = bg_depth
+
+    # Ground-plane scale alignment: align depth_work to bg_work scale per-sample.
+    if ground_mask is not None:
+        b = depth_work.shape[0]
+        depth_aligned = depth_work.clone()
+        for i in range(b):
+            mask_i = ground_mask[i, 0].bool()  # [H,W]
+            d_vals = depth_work[i, 0][mask_i]
+            bg_vals = bg_work[i, 0][mask_i]
+            if d_vals.numel() >= 4 and bg_vals.numel() >= 4:
+                d_median = d_vals.median()
+                bg_median = bg_vals.median()
+                if d_median.abs() > eps:
+                    scale = bg_median / d_median
+                    depth_aligned[i] = depth_work[i] * scale
+        depth_work = depth_aligned
+
     if assume_inverse:
         depth_work = torch.where(
             torch.isfinite(depth_work),

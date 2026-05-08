@@ -42,6 +42,8 @@ model:
   comparator_layers: 2
   comparator_num_heads: 4
   comparator_patch_size: 16
+  person_region_mode: mask
+  bbox_expand_ratio: 0.25
 
 eval:
   save_visualizations: true

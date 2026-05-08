@@ -379,6 +379,8 @@ def main() -> None:
             comparator_layers=cfg.model.comparator_layers,
             comparator_num_heads=cfg.model.comparator_num_heads,
             comparator_patch_size=cfg.model.comparator_patch_size,
+            person_region_mode=cfg.model.person_region_mode,
+            bbox_expand_ratio=cfg.model.bbox_expand_ratio,
         ).to(device)
         if distributed:
             model = DDP(
@@ -466,8 +468,8 @@ def main() -> None:
                     if "image_pair_raw" not in batch:
                         raise RuntimeError("image_pair_raw is required for consistency branch.")
                     image_pair = batch["image_pair"].to(device)
-                    person_mask = segmenter.infer_batch(batch["image_raw"], device)
-                    person_mask_pair = segmenter.infer_batch(batch["image_pair_raw"], device)
+                    person_mask, person_bbox = segmenter.infer_batch_regions(batch["image_raw"], device)
+                    person_mask_pair, _ = segmenter.infer_batch_regions(batch["image_pair_raw"], device)
                     target, mask = _resolve_online_supervision(
                         batch=batch,
                         target=target,
@@ -490,7 +492,14 @@ def main() -> None:
                     batch_size = image.shape[0]
                     forward_out = model(
                         torch.cat([image, image_pair], dim=0),
-                        pair_inputs=(idx_i, idx_j, person_mask) if pair_label.numel() > 0 else None,
+                        pair_inputs={
+                            "idx_i": idx_i,
+                            "idx_j": idx_j,
+                            "person_mask": person_mask,
+                            "person_bbox": person_bbox,
+                        }
+                        if pair_label.numel() > 0
+                        else None,
                     )
                     pred_all = forward_out["pred_height_map"]
                     pred = pred_all[:batch_size]

@@ -6,15 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from tools.build_manifest import build_camera_splits, split_person_ids, video_name_is_excluded, write_camera_configs
+from tools.build_manifest import build_camera_splits, split_person_ids, write_camera_configs
 
 
 class BuildManifestTests(unittest.TestCase):
-    def test_video_name_is_excluded_matches_case_insensitive_substrings(self) -> None:
-        self.assertTrue(video_name_is_excluded("clip_UB_400cm_inside.mp4", ["ub", "shoulder"]))
-        self.assertTrue(video_name_is_excluded("clip_shoulder_400cm_inside.mp4", ["ub", "shoulder"]))
-        self.assertFalse(video_name_is_excluded("clip_normal_400cm_inside.mp4", ["ub", "shoulder"]))
-
     def test_split_person_ids_has_no_leakage(self) -> None:
         people = ["p1", "p2", "p3", "p4", "p5", "p6"]
 

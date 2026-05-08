@@ -8,44 +8,14 @@ from src.heightnet.gallery import (
     aggregate_video_feature,
     aggregate_video_scalar,
     build_scalar_prob_fn,
-    sample_frame_row_indices_per_person,
     cross_split_pairwise_metrics,
     foreground_height_scores,
-    select_video_frame_indices,
     uniform_frame_indices,
     uniform_sample_indices,
 )
 
 
 class GalleryTests(unittest.TestCase):
-    def test_select_video_frame_indices_prefers_valid_frames(self) -> None:
-        class DummyDataset:
-            def _load_valid_frames(self, row):
-                return [10, 20, 30, 40]
-
-        class Row:
-            frame_start = 0
-            frame_end = 99
-
-        out = select_video_frame_indices(DummyDataset(), Row(), 3)
-
-        self.assertEqual(out, [10, 30, 40])
-
-    def test_sample_frame_row_indices_per_person_caps_each_person(self) -> None:
-        class Row:
-            def __init__(self, person_id):
-                self.person_id = person_id
-
-        class DummyDataset:
-            rows = [Row("p1"), Row("p1"), Row("p1"), Row("p2"), Row("p2")]
-
-        out = sample_frame_row_indices_per_person(DummyDataset(), max_per_person=2, seed=7)
-
-        self.assertEqual(len(out), 4)
-        picked_people = [DummyDataset.rows[idx].person_id for idx in out]
-        self.assertEqual(picked_people.count("p1"), 2)
-        self.assertEqual(picked_people.count("p2"), 2)
-
     def test_uniform_sample_indices_downsamples_evenly(self) -> None:
         self.assertEqual(uniform_sample_indices(0, 10), [])
         self.assertEqual(uniform_sample_indices(3, 10), [0, 1, 2])

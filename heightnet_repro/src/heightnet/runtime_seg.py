@@ -22,6 +22,27 @@ def select_largest_person_mask(arr: np.ndarray, h: int, w: int) -> np.ndarray:
     return pm
 
 
+def select_largest_person_box(arr: np.ndarray, h: int, w: int) -> np.ndarray:
+    if arr.size == 0:
+        return np.array([-1.0, -1.0, -1.0, -1.0], dtype=np.float32)
+    best_idx = -1
+    best_area = -1.0
+    for idx, box in enumerate(arr):
+        x1, y1, x2, y2 = [float(v) for v in box[:4]]
+        area = max(0.0, x2 - x1) * max(0.0, y2 - y1)
+        if area > best_area:
+            best_area = area
+            best_idx = idx
+    if best_idx < 0:
+        return np.array([-1.0, -1.0, -1.0, -1.0], dtype=np.float32)
+    box = arr[best_idx, :4].astype(np.float32).copy()
+    box[0] = float(np.clip(box[0], 0.0, w))
+    box[2] = float(np.clip(box[2], 0.0, w))
+    box[1] = float(np.clip(box[1], 0.0, h))
+    box[3] = float(np.clip(box[3], 0.0, h))
+    return box
+
+
 class PersonSegmenter:
     def __init__(
         self,
@@ -46,9 +67,16 @@ class PersonSegmenter:
 
     @torch.no_grad()
     def infer_batch(self, images_raw: torch.Tensor, device: torch.device) -> torch.Tensor:
+        masks, _ = self.infer_batch_regions(images_raw, device)
+        return masks
+
+    @torch.no_grad()
+    def infer_batch_regions(self, images_raw: torch.Tensor, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
         """
         images_raw: uint8 tensor, shape [B, 3, H, W], RGB.
-        returns: float tensor [B, 1, H, W], {0,1}
+        returns:
+          masks: float tensor [B, 1, H, W], {0,1}
+          boxes: float tensor [B, 4], xyxy in image coordinates, [-1,-1,-1,-1] if missing
         """
         if images_raw.ndim != 4:
             raise ValueError(f"images_raw should be [B,3,H,W], got {tuple(images_raw.shape)}")
@@ -72,9 +100,15 @@ class PersonSegmenter:
         )
 
         masks = []
+        boxes = []
         for i in range(b):
             r = results[i]
             pm = np.zeros((h, w), dtype=np.uint8)
+            pb = np.array([-1.0, -1.0, -1.0, -1.0], dtype=np.float32)
+            if getattr(r, "boxes", None) is not None and r.boxes.xyxy is not None:
+                xyxy = r.boxes.xyxy.detach().cpu().numpy()
+                if xyxy.size > 0:
+                    pb = select_largest_person_box(xyxy, h, w)
             if getattr(r, "masks", None) is not None and r.masks.data is not None:
                 arr = r.masks.data.detach().cpu().numpy()
                 resized = []
@@ -92,4 +126,5 @@ class PersonSegmenter:
                 if resized:
                     pm = select_largest_person_mask(np.stack(resized, axis=0), h, w)
             masks.append(torch.from_numpy(pm.astype(np.float32)).unsqueeze(0))
-        return torch.stack(masks, dim=0).to(device)
+            boxes.append(torch.from_numpy(pb))
+        return torch.stack(masks, dim=0).to(device), torch.stack(boxes, dim=0).to(device)

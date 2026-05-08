@@ -119,6 +119,8 @@ def main() -> None:
         comparator_layers=cfg.model.comparator_layers,
         comparator_num_heads=cfg.model.comparator_num_heads,
         comparator_patch_size=cfg.model.comparator_patch_size,
+        person_region_mode=cfg.model.person_region_mode,
+        bbox_expand_ratio=cfg.model.bbox_expand_ratio,
     ).to(device)
     ckpt = _torch_load_compat(args.checkpoint, map_location=device)
     model.load_state_dict(ckpt["model"])
@@ -143,13 +145,13 @@ def main() -> None:
             image = sample["image"].unsqueeze(0).to(device)
             image_raw = sample["image_raw"].unsqueeze(0)
             pred_height = model(image)["pred_height_map"]
-            person_mask = segmenter.infer_batch(image_raw, device)
+            person_mask, person_bbox = segmenter.infer_batch_regions(image_raw, device)
             keep = person_mask_is_valid(
                 person_mask,
                 min_valid_pixels=cfg.loss.min_valid_pixels,
                 min_valid_ratio=cfg.loss.min_valid_ratio,
             )
-            fg_height = pred_height * (person_mask > 0.5).float()
+            fg_height = model.build_person_region(pred_height, person_mask, person_bbox)
 
             person_dir = os.path.join(args.out_dir, person_id)
             ensure_dir(person_dir)

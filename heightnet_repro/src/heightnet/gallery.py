@@ -176,7 +176,7 @@ def build_frame_feature_gallery(
         image = sample["image"].unsqueeze(0).to(device)
         image_raw = sample["image_raw"].unsqueeze(0)
         pred = model_ref(image)["pred_height_map"]
-        person_mask = segmenter.infer_batch(image_raw, device)
+        person_mask, person_bbox = segmenter.infer_batch_regions(image_raw, device)
         keep = person_mask_is_valid(
             person_mask,
             min_valid_pixels=min_valid_pixels,
@@ -184,7 +184,7 @@ def build_frame_feature_gallery(
         )
         if not bool(keep[0].item()):
             continue
-        feat = model_ref.encode_person(pred, person_mask)[0].detach().cpu()
+        feat = model_ref.encode_person(pred, person_mask, person_bbox)[0].detach().cpu()
         records.append(
             {
                 "sequence_id": sample["sequence_id"],
@@ -223,7 +223,7 @@ def build_video_feature_gallery(
             image = sample["image"].unsqueeze(0).to(device)
             image_raw = sample["image_raw"].unsqueeze(0)
             pred = model_ref(image)["pred_height_map"]
-            person_mask = segmenter.infer_batch(image_raw, device)
+            person_mask, person_bbox = segmenter.infer_batch_regions(image_raw, device)
             keep = person_mask_is_valid(
                 person_mask,
                 min_valid_pixels=min_valid_pixels,
@@ -231,7 +231,7 @@ def build_video_feature_gallery(
             )
             if not bool(keep[0].item()):
                 continue
-            feat = model_ref.encode_person(pred, person_mask)[0].detach().cpu()
+            feat = model_ref.encode_person(pred, person_mask, person_bbox)[0].detach().cpu()
             frame_features.append(feat)
             sampled_frames.append(int(actual_frame_idx))
         if not frame_features:
@@ -279,7 +279,7 @@ def build_video_stat_gallery(
             image = sample["image"].unsqueeze(0).to(device)
             image_raw = sample["image_raw"].unsqueeze(0)
             pred = model_ref(image)["pred_height_map"]
-            person_mask = segmenter.infer_batch(image_raw, device)
+            person_mask, _ = segmenter.infer_batch_regions(image_raw, device)
             keep = person_mask_is_valid(
                 person_mask,
                 min_valid_pixels=min_valid_pixels,

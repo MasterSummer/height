@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import models
 
 
 class ConvBlock(nn.Module):
@@ -48,6 +51,103 @@ class ResidualBlock(nn.Module):
         return out
 
 
+
+
+class GeometryBranch(nn.Module):
+    """Explicit geometric feature MLP.
+    Input: 5-dim vector per person
+      [foot_height_median, head_height_median, bbox_height_ratio,
+       height_std, person_bg_height_diff]
+    Output: feat_ch-dim feature vector (same dim as visual features)
+    """
+    def __init__(self, geo_feat_dim: int = 5, feat_ch: int = 64, hidden_dim: int = 32) -> None:
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(geo_feat_dim, hidden_dim),
+            nn.ReLU(inplace=False),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(inplace=False),
+            nn.Linear(hidden_dim, feat_ch),
+        )
+
+    def forward(self, geo_feat: torch.Tensor) -> torch.Tensor:
+        return self.mlp(geo_feat)
+
+
+def extract_geo_features(
+    height: torch.Tensor,
+    mask: torch.Tensor,
+    bg_depth: torch.Tensor | None = None,
+    person_bbox: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """Extract 5-dim geometric features from height map + mask."""
+    b = height.shape[0]
+    h, w = height.shape[-2], height.shape[-1]
+    m = (mask > 0.5).float()
+
+    foot_depths = []
+    head_depths = []
+    bbox_ratios = []
+    depth_stds = []
+    bg_diffs = []
+
+    for i in range(b):
+        mi = m[i, 0]
+        hi = height[i, 0]
+        nonzero_rows = mi.sum(dim=1) > 0
+        if nonzero_rows.sum() == 0:
+            foot_depths.append(0.0)
+            head_depths.append(0.0)
+            bbox_ratios.append(0.0)
+            depth_stds.append(0.0)
+            bg_diffs.append(0.0)
+            continue
+
+        row_indices = torch.where(nonzero_rows)[0]
+        top_row = row_indices[0].item()
+        bot_row = row_indices[-1].item()
+        span = bot_row - top_row + 1
+
+        head_end = top_row + max(1, int(span * 0.2))
+        head_mask = mi[top_row:head_end, :]
+        head_vals = hi[top_row:head_end, :][head_mask > 0.5]
+        head_med = float(head_vals.median()) if head_vals.numel() > 0 else 0.0
+
+        foot_start = bot_row - max(1, int(span * 0.2)) + 1
+        foot_mask = mi[foot_start:bot_row + 1, :]
+        foot_vals = hi[foot_start:bot_row + 1, :][foot_mask > 0.5]
+        foot_med = float(foot_vals.median()) if foot_vals.numel() > 0 else 0.0
+
+        ratio = span / float(h)
+
+        all_vals = hi[mi > 0.5]
+        dstd = float(all_vals.std()) if all_vals.numel() > 1 else 0.0
+
+        if bg_depth is not None:
+            bgi = bg_depth[i, 0]
+            bg_vals = bgi[mi <= 0.5]
+            if bg_vals.numel() > 0 and all_vals.numel() > 0:
+                diff = float(all_vals.mean()) - float(bg_vals.mean())
+            else:
+                diff = 0.0
+        else:
+            diff = 0.0
+
+        foot_depths.append(foot_med)
+        head_depths.append(head_med)
+        bbox_ratios.append(ratio)
+        depth_stds.append(dstd)
+        bg_diffs.append(diff)
+
+    geo = torch.stack([
+        torch.tensor(foot_depths, dtype=torch.float32, device=height.device),
+        torch.tensor(head_depths, dtype=torch.float32, device=height.device),
+        torch.tensor(bbox_ratios, dtype=torch.float32, device=height.device),
+        torch.tensor(depth_stds, dtype=torch.float32, device=height.device),
+        torch.tensor(bg_diffs, dtype=torch.float32, device=height.device),
+    ], dim=1)
+    return geo
+
 class PairComparatorHead(nn.Module):
     def __init__(
         self,
@@ -56,6 +156,9 @@ class PairComparatorHead(nn.Module):
         comparator_layers: int = 2,
         comparator_num_heads: int = 4,
         comparator_patch_size: int = 16,
+        histogram_min: float = 0.0,
+        histogram_max: float = 3.0,
+        compare_type: str = "concat",
     ) -> None:
         super().__init__()
         self.feat_ch = int(feat_ch)
@@ -63,11 +166,14 @@ class PairComparatorHead(nn.Module):
         self.comparator_layers = int(comparator_layers)
         self.comparator_num_heads = int(comparator_num_heads)
         self.comparator_patch_size = int(comparator_patch_size)
+        self.compare_type = str(compare_type).lower()
 
         if self.comparator_type == "conv":
             self.embed = self._build_conv_encoder()
         elif self.comparator_type == "resnet":
             self.embed = self._build_resnet_encoder()
+        elif self.comparator_type == "resnet34":
+            self.embed = self._build_resnet34_encoder()
         elif self.comparator_type == "vit":
             self.patch_embed = nn.Conv2d(
                 1,
@@ -86,14 +192,49 @@ class PairComparatorHead(nn.Module):
             )
             self.vit_encoder = nn.TransformerEncoder(encoder_layer, num_layers=max(1, self.comparator_layers))
             self.vit_norm = nn.LayerNorm(self.feat_ch)
+        elif self.comparator_type == "histogram":
+            centers = torch.linspace(float(histogram_min), float(histogram_max), self.feat_ch)
+            sigma = (float(histogram_max) - float(histogram_min)) / max(self.feat_ch - 1, 1)
+            self.register_buffer("hist_centers", centers)
+            self.register_buffer("hist_sigma", torch.tensor(sigma, dtype=torch.float32))
+            self.hist_mlp = nn.Sequential(
+                nn.Linear(self.feat_ch, self.feat_ch * 2),
+                nn.ReLU(inplace=False),
+                nn.Linear(self.feat_ch * 2, self.feat_ch),
+            )
+        elif self.comparator_type == "resnet_stats":
+            self.embed = self._build_resnet_encoder()
+            n_stats = 5
+            self.stats_proj = nn.Linear(n_stats, self.feat_ch)
+        elif self.comparator_type == "histogram_stats":
+            centers = torch.linspace(float(histogram_min), float(histogram_max), self.feat_ch)
+            sigma = (float(histogram_max) - float(histogram_min)) / max(self.feat_ch - 1, 1)
+            self.register_buffer("hist_centers", centers)
+            self.register_buffer("hist_sigma", torch.tensor(sigma, dtype=torch.float32))
+            n_stats = 5
+            self.hist_mlp = nn.Sequential(
+                nn.Linear(self.feat_ch + n_stats, self.feat_ch * 2),
+                nn.ReLU(inplace=False),
+                nn.Linear(self.feat_ch * 2, self.feat_ch),
+            )
         else:
             raise ValueError(f"unsupported comparator_type: {self.comparator_type}")
 
-        self.cls = nn.Sequential(
-            nn.Linear(self.feat_ch * 3, self.feat_ch),
-            nn.ReLU(inplace=False),
-            nn.Linear(self.feat_ch, 1),
-        )
+        if self.compare_type == "xattn":
+            n_heads = max(1, min(self.comparator_num_heads, self.feat_ch // 4))
+            self.xattn = nn.MultiheadAttention(self.feat_ch, num_heads=n_heads, batch_first=True)
+            self.xattn_norm = nn.LayerNorm(self.feat_ch)
+            self.cls = nn.Sequential(
+                nn.Linear(self.feat_ch * 4, self.feat_ch),
+                nn.ReLU(inplace=False),
+                nn.Linear(self.feat_ch, 1),
+            )
+        else:
+            self.cls = nn.Sequential(
+                nn.Linear(self.feat_ch * 3, self.feat_ch),
+                nn.ReLU(inplace=False),
+                nn.Linear(self.feat_ch, 1),
+            )
 
     def _build_conv_encoder(self) -> nn.Module:
         layers: list[nn.Module] = []
@@ -121,6 +262,34 @@ class PairComparatorHead(nn.Module):
         layers.append(nn.AdaptiveAvgPool2d((1, 1)))
         return nn.Sequential(*layers)
 
+    def _build_resnet34_encoder(self) -> nn.Module:
+        backbone = models.resnet34(weights=None)
+        backbone.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        backbone.fc = nn.Identity()
+        return nn.Sequential(
+            backbone,
+            nn.Linear(512, self.feat_ch),
+        )
+
+    def _extract_stats(self, fg_height: torch.Tensor) -> torch.Tensor:
+        b = fg_height.shape[0]
+        vals = fg_height.view(b, -1)
+        mask = vals > 1e-4
+        stats = []
+        for i in range(b):
+            v = vals[i][mask[i]]
+            if v.numel() < 2:
+                stats.append(torch.zeros(5, device=fg_height.device))
+            else:
+                stats.append(torch.stack([
+                    v.mean(),
+                    v.std(),
+                    v.median(),
+                    v.quantile(0.9),
+                    v.quantile(0.1),
+                ]))
+        return torch.stack(stats, dim=0)
+
     def encode(self, fg_height: torch.Tensor) -> torch.Tensor:
         if self.comparator_type == "vit":
             x = self.patch_embed(fg_height)
@@ -134,17 +303,200 @@ class PairComparatorHead(nn.Module):
             tokens = self.vit_norm(tokens)
             return tokens.mean(dim=1)
 
+        if self.comparator_type == "histogram":
+            b = fg_height.shape[0]
+            vals = fg_height.view(b, -1)
+            mask = vals > 1e-4
+            centers = self.hist_centers.view(1, 1, -1)
+            sigma = self.hist_sigma
+            vals_exp = vals.unsqueeze(2)
+            weights = torch.exp(-0.5 * ((vals_exp - centers) / sigma) ** 2)
+            mask_exp = mask.unsqueeze(2).float()
+            hist = (weights * mask_exp).sum(dim=1)
+            denom = mask.float().sum(dim=1, keepdim=True).clamp(min=1.0)
+            hist = hist / denom
+            return self.hist_mlp(hist)
+
+        if self.comparator_type == "histogram_stats":
+            b = fg_height.shape[0]
+            vals = fg_height.view(b, -1)
+            mask = vals > 1e-4
+            centers = self.hist_centers.view(1, 1, -1)
+            sigma = self.hist_sigma
+            vals_exp = vals.unsqueeze(2)
+            weights = torch.exp(-0.5 * ((vals_exp - centers) / sigma) ** 2)
+            mask_exp = mask.unsqueeze(2).float()
+            hist = (weights * mask_exp).sum(dim=1)
+            denom = mask.float().sum(dim=1, keepdim=True).clamp(min=1.0)
+            hist = hist / denom
+            stats = self._extract_stats(fg_height)
+            return self.hist_mlp(torch.cat([hist, stats], dim=1))
+
+        if self.comparator_type == "resnet_stats":
+            feat = self.embed(fg_height).flatten(1)
+            stats = self._extract_stats(fg_height)
+            return feat + self.stats_proj(stats)
+
         feat = self.embed(fg_height)
         return feat.flatten(1)
 
     def compare_encoded(self, fa: torch.Tensor, fb: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([fa, fb, fa - fb], dim=1)
+        if self.compare_type == "xattn":
+            a = fa.unsqueeze(1)
+            b = fb.unsqueeze(1)
+            ab = torch.cat([a, b], dim=1)
+            attn_out, _ = self.xattn(ab, ab, ab)
+            attn_out = self.xattn_norm(ab + attn_out)
+            fa_attn = attn_out[:, 0]
+            fb_attn = attn_out[:, 1]
+            x = torch.cat([fa_attn, fb_attn, fa_attn - fb_attn, fa * fb], dim=1)
+        else:
+            x = torch.cat([fa, fb, fa - fb], dim=1)
         return self.cls(x).squeeze(1)
 
     def forward(self, fg_a: torch.Tensor, fg_b: torch.Tensor) -> torch.Tensor:
         fa = self.encode(fg_a)
         fb = self.encode(fg_b)
         return self.compare_encoded(fa, fb)
+
+
+class DerivedHeightRanker(nn.Module):
+    """Pairwise ranker that consumes derived height maps directly."""
+
+    def __init__(
+        self,
+        comparator_channels: int = 16,
+        comparator_type: str = "conv",
+        comparator_layers: int = 2,
+        comparator_num_heads: int = 4,
+        comparator_patch_size: int = 16,
+        person_region_mode: str = "mask",
+        bbox_expand_ratio: float = 0.0,
+        histogram_min: float = 0.0,
+        histogram_max: float = 3.0,
+        compare_type: str = "concat",
+        use_geometry_branch: bool = False,
+        geo_feat_dim: int = 5,
+        geo_hidden_dim: int = 32,
+    ) -> None:
+        super().__init__()
+        self.person_region_mode = str(person_region_mode).lower()
+        self.bbox_expand_ratio = float(bbox_expand_ratio)
+        self.use_geometry_branch = use_geometry_branch
+        if self.person_region_mode not in {"mask", "bbox"}:
+            raise ValueError(f"unsupported person_region_mode: {self.person_region_mode}")
+
+        self.pair_head = PairComparatorHead(
+            feat_ch=comparator_channels,
+            comparator_type=comparator_type,
+            comparator_layers=comparator_layers,
+            comparator_num_heads=comparator_num_heads,
+            comparator_patch_size=comparator_patch_size,
+            histogram_min=histogram_min,
+            histogram_max=histogram_max,
+            compare_type=compare_type,
+        )
+
+        if self.use_geometry_branch:
+            self.geo_branch = GeometryBranch(
+                geo_feat_dim=geo_feat_dim,
+                feat_ch=comparator_channels,
+                hidden_dim=geo_hidden_dim,
+            )
+
+    def build_person_region(
+        self,
+        height: torch.Tensor,
+        mask: torch.Tensor,
+        bbox: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if self.person_region_mode == "mask":
+            return height * (mask > 0.5).float()
+
+        if bbox is None:
+            raise ValueError("bbox is required when person_region_mode='bbox'")
+        if bbox.ndim != 2 or bbox.shape[1] != 4:
+            raise ValueError(f"bbox should be [B,4], got {tuple(bbox.shape)}")
+
+        b, _, h, w = height.shape
+        fg = torch.zeros_like(height)
+        for i in range(b):
+            x1, y1, x2, y2 = [float(v) for v in bbox[i].tolist()]
+            if x2 <= x1 or y2 <= y1:
+                continue
+            bw = x2 - x1
+            bh = y2 - y1
+            dx = bw * self.bbox_expand_ratio
+            dy = bh * self.bbox_expand_ratio
+            x1i = max(0, int(math.floor(x1 - dx)))
+            y1i = max(0, int(math.floor(y1 - dy)))
+            x2i = min(w, int(math.ceil(x2 + dx)))
+            y2i = min(h, int(math.ceil(y2 + dy)))
+            if x2i <= x1i or y2i <= y1i:
+                continue
+            fg[i, :, y1i:y2i, x1i:x2i] = height[i, :, y1i:y2i, x1i:x2i]
+        return fg
+
+    def encode_person(self, height: torch.Tensor, mask: torch.Tensor, bbox: torch.Tensor | None = None, bg_depth: torch.Tensor | None = None) -> torch.Tensor:
+        fg = self.build_person_region(height, mask, bbox)
+        visual_feat = self.pair_head.encode(fg)
+        if self.use_geometry_branch and bg_depth is not None:
+            geo_feat = extract_geo_features(height, mask, bg_depth, bbox)
+            geo_emb = self.geo_branch(geo_feat)
+            return visual_feat + geo_emb
+        return visual_feat
+
+    def compare_pair(
+        self,
+        height_a: torch.Tensor,
+        mask_a: torch.Tensor,
+        height_b: torch.Tensor,
+        mask_b: torch.Tensor,
+        bbox_a: torch.Tensor | None = None,
+        bbox_b: torch.Tensor | None = None,
+        bg_depth_a: torch.Tensor | None = None,
+        bg_depth_b: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        fa = self.encode_person(height_a, mask_a, bbox_a, bg_depth_a)
+        fb = self.encode_person(height_b, mask_b, bbox_b, bg_depth_b)
+        return self.compare_encoded(fa, fb)
+
+    def compare_encoded(self, fa: torch.Tensor, fb: torch.Tensor) -> torch.Tensor:
+        return self.pair_head.compare_encoded(fa, fb)
+
+    def forward(
+        self,
+        pair_inputs: dict | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None = None,
+    ) -> dict:
+        out = {"pred_height_map": None, "pair_logit": None}
+        if pair_inputs is None:
+            return out
+        if isinstance(pair_inputs, dict):
+            source = pair_inputs["height_map"]
+            idx_i = pair_inputs["idx_i"]
+            idx_j = pair_inputs["idx_j"]
+            person_mask = pair_inputs["person_mask"]
+            person_bbox = pair_inputs.get("person_bbox")
+            h_a = source.index_select(0, idx_i)
+            m_a = person_mask.index_select(0, idx_i)
+            h_b = source.index_select(0, idx_j)
+            m_b = person_mask.index_select(0, idx_j)
+            bg_depth = pair_inputs.get("bg_depth")
+            b_a = person_bbox.index_select(0, idx_i) if person_bbox is not None else None
+            b_b = person_bbox.index_select(0, idx_j) if person_bbox is not None else None
+            bg_a = bg_depth.index_select(0, idx_i) if bg_depth is not None else None
+            bg_b = bg_depth.index_select(0, idx_j) if bg_depth is not None else None
+        elif len(pair_inputs) == 4:
+            h_a, m_a, h_b, m_b = pair_inputs
+            b_a = None
+            b_b = None
+            bg_a = None
+            bg_b = None
+        else:
+            raise ValueError("unsupported pair_inputs format")
+
+        out["pair_logit"] = self.compare_pair(h_a, m_a, h_b, m_b, b_a, b_b, bg_a, bg_b)
+        return out
 
 
 class HeightNetTiny(nn.Module):
@@ -158,9 +510,15 @@ class HeightNetTiny(nn.Module):
         comparator_layers: int = 2,
         comparator_num_heads: int = 4,
         comparator_patch_size: int = 16,
+        person_region_mode: str = "mask",
+        bbox_expand_ratio: float = 0.0,
     ) -> None:
         super().__init__()
         b = base_channels
+        self.person_region_mode = str(person_region_mode).lower()
+        self.bbox_expand_ratio = float(bbox_expand_ratio)
+        if self.person_region_mode not in {"mask", "bbox"}:
+            raise ValueError(f"unsupported person_region_mode: {self.person_region_mode}")
 
         self.enc1 = ConvBlock(3, b)
         self.enc2 = ConvBlock(b, b * 2)
@@ -187,6 +545,39 @@ class HeightNetTiny(nn.Module):
             comparator_patch_size=comparator_patch_size,
         )
 
+    def build_person_region(
+        self,
+        height: torch.Tensor,
+        mask: torch.Tensor,
+        bbox: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        if self.person_region_mode == "mask":
+            return height * (mask > 0.5).float()
+
+        if bbox is None:
+            raise ValueError("bbox is required when person_region_mode='bbox'")
+        if bbox.ndim != 2 or bbox.shape[1] != 4:
+            raise ValueError(f"bbox should be [B,4], got {tuple(bbox.shape)}")
+
+        b, _, h, w = height.shape
+        fg = torch.zeros_like(height)
+        for i in range(b):
+            x1, y1, x2, y2 = [float(v) for v in bbox[i].tolist()]
+            if x2 <= x1 or y2 <= y1:
+                continue
+            bw = x2 - x1
+            bh = y2 - y1
+            dx = bw * self.bbox_expand_ratio
+            dy = bh * self.bbox_expand_ratio
+            x1i = max(0, int(math.floor(x1 - dx)))
+            y1i = max(0, int(math.floor(y1 - dy)))
+            x2i = min(w, int(math.ceil(x2 + dx)))
+            y2i = min(h, int(math.ceil(y2 + dy)))
+            if x2i <= x1i or y2i <= y1i:
+                continue
+            fg[i, :, y1i:y2i, x1i:x2i] = height[i, :, y1i:y2i, x1i:x2i]
+        return fg
+
     def predict_height(self, x: torch.Tensor) -> torch.Tensor:
         e1 = self.enc1(x)
         e2 = self.enc2(self.pool(e1))
@@ -204,14 +595,29 @@ class HeightNetTiny(nn.Module):
 
         return F.softplus(self.height_head(d1))
 
-    def compare_pair(self, height_a: torch.Tensor, mask_a: torch.Tensor, height_b: torch.Tensor, mask_b: torch.Tensor) -> torch.Tensor:
-        fa = self.encode_person(height_a, mask_a)
-        fb = self.encode_person(height_b, mask_b)
+    def compare_pair(
+        self,
+        height_a: torch.Tensor,
+        mask_a: torch.Tensor,
+        height_b: torch.Tensor,
+        mask_b: torch.Tensor,
+        bbox_a: torch.Tensor | None = None,
+        bbox_b: torch.Tensor | None = None,
+        bg_depth_a: torch.Tensor | None = None,
+        bg_depth_b: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        fa = self.encode_person(height_a, mask_a, bbox_a, bg_depth_a)
+        fb = self.encode_person(height_b, mask_b, bbox_b, bg_depth_b)
         return self.compare_encoded(fa, fb)
 
-    def encode_person(self, height: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        fg = height * (mask > 0.5).float()
-        return self.pair_head.encode(fg)
+    def encode_person(self, height: torch.Tensor, mask: torch.Tensor, bbox: torch.Tensor | None = None, bg_depth: torch.Tensor | None = None) -> torch.Tensor:
+        fg = self.build_person_region(height, mask, bbox)
+        visual_feat = self.pair_head.encode(fg)
+        if self.use_geometry_branch and bg_depth is not None:
+            geo_feat = extract_geo_features(height, mask, bg_depth, bbox)
+            geo_emb = self.geo_branch(geo_feat)
+            return visual_feat + geo_emb
+        return visual_feat
 
     def compare_encoded(self, fa: torch.Tensor, fb: torch.Tensor) -> torch.Tensor:
         return self.pair_head.compare_encoded(fa, fb)
@@ -219,21 +625,30 @@ class HeightNetTiny(nn.Module):
     def forward(
         self,
         image: torch.Tensor | None = None,
-        pair_inputs: tuple[torch.Tensor, torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None = None,
+        pair_inputs: dict | tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor] | None = None,
     ) -> dict:
         pred_height_map = self.predict_height(image) if image is not None else None
         out = {"pred_height_map": pred_height_map, "pair_logit": None}
         if pair_inputs is not None:
-            if len(pair_inputs) == 4:
-                h_a, m_a, h_b, m_b = pair_inputs
-            else:
+            if isinstance(pair_inputs, dict):
                 if pred_height_map is None:
                     raise ValueError("pred_height_map is required when pair_inputs is index-based")
-                idx_i, idx_j, person_mask = pair_inputs
+                idx_i = pair_inputs["idx_i"]
+                idx_j = pair_inputs["idx_j"]
+                person_mask = pair_inputs["person_mask"]
+                person_bbox = pair_inputs.get("person_bbox")
                 source = pred_height_map[: person_mask.shape[0]]
                 h_a = source.index_select(0, idx_i)
                 m_a = person_mask.index_select(0, idx_i)
                 h_b = source.index_select(0, idx_j)
                 m_b = person_mask.index_select(0, idx_j)
-            out["pair_logit"] = self.compare_pair(h_a, m_a, h_b, m_b)
+                b_a = person_bbox.index_select(0, idx_i) if person_bbox is not None else None
+                b_b = person_bbox.index_select(0, idx_j) if person_bbox is not None else None
+            elif len(pair_inputs) == 4:
+                h_a, m_a, h_b, m_b = pair_inputs
+                b_a = None
+                b_b = None
+            else:
+                raise ValueError("unsupported pair_inputs format")
+            out["pair_logit"] = self.compare_pair(h_a, m_a, h_b, m_b, b_a, b_b)
         return out

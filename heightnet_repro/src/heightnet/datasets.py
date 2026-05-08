@@ -341,6 +341,16 @@ class HeightDataset(Dataset):
                 out.append(left)
         return out
 
+    def _single_frame_loose_retry_order(self, frame_idx: int, radius: int = 8) -> List[int]:
+        out = [frame_idx]
+        for offset in range(1, radius + 1):
+            right = frame_idx + offset
+            left = frame_idx - offset
+            out.append(right)
+            if left >= 0:
+                out.append(left)
+        return out
+
     def _load_cache_array(self, path: str) -> np.ndarray:
         if path in self._cache_arrays:
             return self._cache_arrays[path]
@@ -423,6 +433,18 @@ class HeightDataset(Dataset):
                     break
                 except RuntimeError as exc:
                     last_error = exc
+            if img_raw is None and row.frame_start == row.frame_end:
+                # Frame manifests often pin a single sampled frame. If that decode fails,
+                # search a small neighborhood in the source video instead of hard-failing.
+                for candidate_idx in self._single_frame_loose_retry_order(frame_idx):
+                    if candidate_idx == frame_idx:
+                        continue
+                    try:
+                        img_raw = self._load_video_frame(row.video_path, candidate_idx)
+                        actual_frame_idx = candidate_idx
+                        break
+                    except RuntimeError as exc:
+                        last_error = exc
         if img_raw is None:
             if last_error is not None:
                 raise RuntimeError(
@@ -452,6 +474,8 @@ class HeightDataset(Dataset):
                 "camera_id": row.camera_id,
                 "sequence_id": row.sequence_id,
                 "frame_idx": frame_idx,
+                "frame_path": row.frame_path,
+                "bg_depth_path": row.bg_depth_path,
             }
         )
 
